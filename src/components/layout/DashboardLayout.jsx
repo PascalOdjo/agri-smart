@@ -67,14 +67,14 @@ export function DashboardLayout() {
       {/* Mobile Sidebar Overlay */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-slate-900/20 z-20 xl:hidden backdrop-blur-sm transition-opacity"
+          className="fixed inset-0 bg-slate-900/20 z-20 lg:hidden backdrop-blur-sm transition-opacity"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 shadow-sm transform transition-transform duration-300 ease-in-out xl:translate-x-0 xl:static xl:inset-auto flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        className={`fixed inset-y-0 left-0 z-30 w-64 bg-white border-r border-slate-200 shadow-sm transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-auto flex flex-col ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
       >
         <div className="flex items-center justify-between h-16 px-6 border-b border-slate-100">
@@ -84,7 +84,7 @@ export function DashboardLayout() {
             </div>
             <span>AgriSmart</span>
           </Link>
-          <button onClick={() => setSidebarOpen(false)} className="xl:hidden text-slate-400 hover:text-slate-600 bg-slate-50 p-1.5 rounded-lg">
+          <button onClick={() => setSidebarOpen(false)} className="lg:hidden text-slate-400 hover:text-slate-600 bg-slate-50 p-1.5 rounded-lg">
             <X className="w-5 h-5" />
           </button>
         </div>
@@ -149,7 +149,7 @@ export function DashboardLayout() {
           <div className="flex items-center">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="mr-4 xl:hidden text-slate-500 hover:text-emerald-600 transition-colors bg-white shadow-sm border border-slate-200 p-2 rounded-lg"
+              className="mr-4 lg:hidden text-slate-500 hover:text-emerald-600 transition-colors bg-white shadow-sm border border-slate-200 p-2 rounded-lg"
             >
               <Menu className="w-5 h-5" />
             </button>

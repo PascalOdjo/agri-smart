@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { Leaf, Lock, AlertCircle } from 'lucide-react'
+import { Leaf, Lock, AlertCircle, Eye, EyeOff } from 'lucide-react'
 import { resetPassword } from '../services/auth.js'
 import { getSupabaseConfigStatus } from '../utils/appConfig.js'
 
 export function ResetPassword() {
     const [password, setPassword] = useState('')
+    const [showPassword, setShowPassword] = useState(false)
     const [confirmPassword, setConfirmPassword] = useState('')
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false)
     const [error, setError] = useState('')
     const [success, setSuccess] = useState('')
     const [loading, setLoading] = useState(false)
@@ -99,13 +101,20 @@ export function ResetPassword() {
                                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-600" />
                                     <input
                                         id="password"
-                                        type="password"
+                                        type={showPassword ? 'text' : 'password'}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
                                         required
-                                        className="w-full rounded-xl border border-emerald-200 bg-white py-3 pl-10 pr-4 text-emerald-900 outline-none transition-all placeholder-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                                        className="w-full rounded-xl border border-emerald-200 bg-white py-3 pl-10 pr-12 text-emerald-900 outline-none transition-all placeholder-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                                         placeholder="••••••••"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-emerald-600 hover:text-emerald-800 transition-colors"
+                                    >
+                                        {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
                                 </div>
                             </div>
 
@@ -117,13 +126,20 @@ export function ResetPassword() {
                                     <Lock className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-emerald-600" />
                                     <input
                                         id="confirmPassword"
-                                        type="password"
+                                        type={showConfirmPassword ? 'text' : 'password'}
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
                                         required
-                                        className="w-full rounded-xl border border-emerald-200 bg-white py-3 pl-10 pr-4 text-emerald-900 outline-none transition-all placeholder-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
+                                        className="w-full rounded-xl border border-emerald-200 bg-white py-3 pl-10 pr-12 text-emerald-900 outline-none transition-all placeholder-emerald-400 focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500"
                                         placeholder="••••••••"
                                     />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                                        className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-emerald-600 hover:text-emerald-800 transition-colors"
+                                    >
+                                        {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                    </button>
                                 </div>
                             </div>
 

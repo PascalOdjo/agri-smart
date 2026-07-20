@@ -43,6 +43,10 @@ export function DiagnosticResult() {
   const solution = diagnostic.solution || diagnostic.treatment
   const ecoAlternative = diagnostic.ecoAlternative || diagnostic.eco_treatment || diagnostic.eco_alternative
   const severity = diagnostic.severity
+  const symptoms = diagnostic.symptoms
+  const cause = diagnostic.cause
+  const prevention = diagnostic.prevention
+  const culturalPractices = diagnostic.culturalPractices || diagnostic.cultural_practices
 
   const severityColor = severity === 'elevee' || severity === 'élevée' || severity === 'high'
     ? 'bg-red-100 text-red-800'
@@ -117,45 +121,45 @@ export function DiagnosticResult() {
         </div>
       )}
 
-      {(diagnostic.symptoms || diagnostic.cause || diagnostic.prevention || diagnostic.cultural_practices) && (
+      {(symptoms || cause || prevention || culturalPractices) && (
         <>
-          {diagnostic.symptoms && (
+          {symptoms && (
             <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Leaf className="w-5 h-5 text-emerald-600" />
                 <h3 className="text-lg font-semibold text-slate-900">Symptômes observés</h3>
               </div>
-              <p className="text-slate-700 leading-relaxed">{diagnostic.symptoms}</p>
+              <p className="text-slate-700 leading-relaxed">{symptoms}</p>
             </div>
           )}
 
-          {diagnostic.cause && (
+          {cause && (
             <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <AlertTriangle className="w-5 h-5 text-amber-600" />
                 <h3 className="text-lg font-semibold text-slate-900">Cause probable</h3>
               </div>
-              <p className="text-slate-700 leading-relaxed">{diagnostic.cause}</p>
+              <p className="text-slate-700 leading-relaxed">{cause}</p>
             </div>
           )}
 
-          {diagnostic.prevention && (
+          {prevention && (
             <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Shield className="w-5 h-5 text-purple-600" />
                 <h3 className="text-lg font-semibold text-slate-900">Mesures préventives</h3>
               </div>
-              <p className="text-slate-700 leading-relaxed">{diagnostic.prevention}</p>
+              <p className="text-slate-700 leading-relaxed">{prevention}</p>
             </div>
           )}
 
-          {diagnostic.cultural_practices && (
+          {culturalPractices && (
             <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
               <div className="flex items-center gap-2 mb-3">
                 <Leaf className="w-5 h-5 text-emerald-600" />
                 <h3 className="text-lg font-semibold text-slate-900">Pratiques culturales recommandées</h3>
               </div>
-              <p className="text-slate-700 leading-relaxed">{diagnostic.cultural_practices}</p>
+              <p className="text-slate-700 leading-relaxed">{culturalPractices}</p>
             </div>
           )}
         </>

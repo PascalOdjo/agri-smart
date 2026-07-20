@@ -1,0 +1,4 @@
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS symptoms TEXT;
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS cause TEXT;
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS prevention TEXT;
+ALTER TABLE diagnostics ADD COLUMN IF NOT EXISTS "culturalPractices" TEXT;

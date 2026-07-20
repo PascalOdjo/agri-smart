@@ -30,6 +30,22 @@ const Diagnostic = sequelize.define('Diagnostic', {
     ecoAlternative: {
         type: DataTypes.TEXT,
         allowNull: true
+    },
+    symptoms: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    cause: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    prevention: {
+        type: DataTypes.TEXT,
+        allowNull: true
+    },
+    culturalPractices: {
+        type: DataTypes.TEXT,
+        allowNull: true
     }
 }, {
     tableName: 'diagnostics'
