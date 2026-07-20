@@ -22,14 +22,20 @@ export function DiagnosticText() {
 
     try {
       const diagnosisResult = await getTextDiagnosis(description)
-      setResult(diagnosisResult)
 
       // Sauvegarder le diagnostic sans image
-      await saveDiagnostic({
+      const diagnostic = await saveDiagnostic({
         userId: user.id,
         imageUrl: null,
         ...diagnosisResult,
       })
+
+      // Naviguer vers la page de résultat
+      if (diagnostic?.id) {
+        navigate(`/diagnostic/${diagnostic.id}`)
+      } else {
+        setResult(diagnosisResult)
+      }
 
     } catch (err) {
       console.error('Erreur diagnostic:', err)
