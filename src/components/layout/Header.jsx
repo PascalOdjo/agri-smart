@@ -50,10 +50,11 @@ export function Header() {
             <>
               <Link
                 to="/dashboard"
-                className="p-2 rounded-lg hover:bg-emerald-600 flex items-center gap-1"
+                className="rounded-lg px-3 py-2 hover:bg-emerald-600 flex items-center gap-2 text-sm font-medium"
                 aria-label="Tableau de bord"
               >
-                <User className="w-5 h-5" />
+                <User className="w-4 h-4" />
+                <span className="hidden sm:inline">Tableau de bord</span>
               </Link>
               <button
                 type="button"

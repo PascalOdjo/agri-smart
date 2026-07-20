@@ -1,28 +1,41 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
+import { fetchCurrentUser, getStoredToken } from '../services/apiAuth.js'
+import { clearAuthToken } from '../lib/api.js'
 
 export function useAuth() {
   const [user, setUser] = useState(null)
-  const [session, setSession] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    let isMounted = true
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    async function loadUser() {
+      setLoading(true)
+      try {
+        if (!getStoredToken()) {
+          if (isMounted) setUser(null)
+          return
+        }
 
-    return () => subscription.unsubscribe()
+        const response = await fetchCurrentUser()
+        if (response?.user && isMounted) {
+          setUser(response.user)
+        }
+      } catch (error) {
+        console.error('Unable to fetch current user:', error)
+        clearAuthToken()
+        if (isMounted) setUser(null)
+      } finally {
+        if (isMounted) setLoading(false)
+      }
+    }
+
+    loadUser()
+
+    return () => {
+      isMounted = false
+    }
   }, [])
 
-  return { user, session, loading }
+  return { user, loading }
 }

@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { 
-  Camera, 
-  Package, 
-  FileText, 
-  TrendingUp, 
-  Activity, 
+import {
+  Camera,
+  Package,
+  FileText,
+  TrendingUp,
+  Activity,
   AlertTriangle,
   ChevronRight,
   Plus,
@@ -21,7 +21,7 @@ import {
 } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
 import { getDiagnosticsByUser } from '../services/diagnostics.js'
-import { supabase } from '../lib/supabase.js'
+import { get } from '../lib/api.js'
 import { WeatherWidget } from '../components/WeatherWidget.jsx'
 
 export function Dashboard() {
@@ -33,35 +33,37 @@ export function Dashboard() {
   const [loading, setLoading] = useState(true)
 
   // Déterminer le rôle de l'utilisateur
-  const userRole = user?.user_metadata?.role || 'farmer' // 'farmer' ou 'client'
+  const userRole = user?.role || 'farmer' // 'farmer' ou 'client'
   const isClient = userRole === 'client'
 
   useEffect(() => {
     if (!user) return
 
-    if (isClient) {
-      // Charger les données du client
-      Promise.all([
-        supabase.from('orders').select('*').eq('client_id', user.id).order('created_at', { ascending: false }),
-      ])
-        .then(([ordersRes]) => {
-          setOrders(ordersRes.data || [])
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false))
-    } else {
-      // Charger les données de l'agriculteur
-      Promise.all([
-        getDiagnosticsByUser(user.id),
-        supabase.from('crops').select('*').eq('user_id', user.id).order('created_at', { ascending: false }),
-      ])
-        .then(([diagRes, cropsRes]) => {
+    const fetchData = async () => {
+      if (isClient) {
+        try {
+          const ordersRes = await get(`/orders?clientId=${user.id}`)
+          setOrders(ordersRes?.orders || [])
+        } catch (err) {
+          console.error(err)
+        } finally {
+          setLoading(false)
+        }
+      } else {
+        try {
+          const diagRes = await getDiagnosticsByUser(user.id)
+          const cropsRes = await get(`/crops?userId=${user.id}`)
           setDiagnostics(diagRes || [])
-          setCrops(cropsRes.data || [])
-        })
-        .catch(console.error)
-        .finally(() => setLoading(false))
+          setCrops(cropsRes?.crops || [])
+        } catch (err) {
+          console.error(err)
+        } finally {
+          setLoading(false)
+        }
+      }
     }
+
+    fetchData()
   }, [user, isClient])
 
   if (loading) {
@@ -100,7 +102,10 @@ export function Dashboard() {
 
   // Calculate some stats
   const totalDiags = diagnostics.length
-  const issuesFound = diagnostics.filter(d => d.disease_name && d.disease_name.toLowerCase() !== 'healthy').length
+  const issuesFound = diagnostics.filter(d => {
+    const name = (d.diseaseName || d.disease_name || '').toLowerCase()
+    return name && name !== 'healthy'
+  }).length
   const totalCrops = crops.length
 
   // Stats pour le client
@@ -116,7 +121,7 @@ export function Dashboard() {
         <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-800 to-indigo-600">
-              Bonjour, {user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Client'} ! 🛒
+              Bonjour, {user?.fullName || user?.email?.split('@')[0] || 'Client'} ! 🛒
             </h1>
             <p className="text-slate-500 mt-1">Bienvenue sur votre espace client.</p>
           </div>
@@ -142,7 +147,7 @@ export function Dashboard() {
             </div>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-slate-900">{totalOrders}</span>
-              <span className="text-sm font-medium text-blue-600 flex items-center"><TrendingUp className="w-4 h-4 mr-1"/> total</span>
+              <span className="text-sm font-medium text-blue-600 flex items-center"><TrendingUp className="w-4 h-4 mr-1" /> total</span>
             </div>
           </div>
 
@@ -183,7 +188,7 @@ export function Dashboard() {
           <div className="xl:col-span-2 space-y-6">
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <ShoppingBag className="w-5 h-5 text-blue-600" /> 
+                <ShoppingBag className="w-5 h-5 text-blue-600" />
                 Commandes Récentes
               </h2>
               <Link to="/orders" className="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center">
@@ -216,25 +221,24 @@ export function Dashboard() {
                         <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 flex items-center justify-center">
                           <Package className="w-6 h-6 text-slate-400" />
                         </div>
-                        
+
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <p className="font-semibold text-slate-800 truncate">
                               Commande #{order.id?.slice(0, 8) || 'Nouvelle commande'}
                             </p>
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${
-                              order.status === 'delivered' ? 'bg-green-50 text-green-700' :
-                              order.status === 'pending' ? 'bg-amber-50 text-amber-700' :
-                              order.status === 'processing' ? 'bg-blue-50 text-blue-700' :
-                              'bg-slate-50 text-slate-700'
-                            }`}>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-medium ${order.status === 'delivered' ? 'bg-green-50 text-green-700' :
+                                order.status === 'pending' ? 'bg-amber-50 text-amber-700' :
+                                  order.status === 'processing' ? 'bg-blue-50 text-blue-700' :
+                                    'bg-slate-50 text-slate-700'
+                              }`}>
                               {order.status === 'delivered' ? 'Livré' :
-                               order.status === 'pending' ? 'En attente' :
-                               order.status === 'processing' ? 'En cours' : order.status}
+                                order.status === 'pending' ? 'En attente' :
+                                  order.status === 'processing' ? 'En cours' : order.status}
                             </span>
                           </div>
                           <div className="flex items-center text-xs text-slate-500 gap-3">
-                            <span>{new Date(order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                            <span>{new Date(order.createdAt || order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
                             {order.total_amount && (
                               <span className="font-medium text-slate-700">
                                 {order.total_amount.toFixed(2)} €
@@ -242,7 +246,7 @@ export function Dashboard() {
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="shrink-0 text-slate-400">
                           <ChevronRight className="w-5 h-5" />
                         </div>
@@ -260,11 +264,11 @@ export function Dashboard() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                  <Store className="w-5 h-5 text-blue-600" /> 
+                  <Store className="w-5 h-5 text-blue-600" />
                   Actions Rapides
                 </h2>
               </div>
-              
+
               <div className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm space-y-3">
                 <Link to="/market" className="flex items-center gap-3 p-3 rounded-xl hover:bg-blue-50 transition-colors">
                   <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
@@ -305,7 +309,7 @@ export function Dashboard() {
             <div className="bg-gradient-to-br from-blue-800 to-indigo-900 rounded-2xl p-6 shadow-md text-white overflow-hidden relative group">
               <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
               <h2 className="text-lg font-bold flex items-center gap-2 mb-3 relative z-10">
-                <Star className="w-5 h-5 opacity-90" /> 
+                <Star className="w-5 h-5 opacity-90" />
                 Produits Recommandés
               </h2>
               <p className="text-blue-100/90 text-sm leading-relaxed mb-5 relative z-10">
@@ -356,7 +360,7 @@ export function Dashboard() {
           </div>
           <div className="flex items-baseline gap-2">
             <span className="text-3xl font-bold text-slate-900">{totalDiags}</span>
-            <span className="text-sm font-medium text-emerald-600 flex items-center"><TrendingUp className="w-4 h-4 mr-1"/> stable</span>
+            <span className="text-sm font-medium text-emerald-600 flex items-center"><TrendingUp className="w-4 h-4 mr-1" /> stable</span>
           </div>
         </div>
 
@@ -397,7 +401,7 @@ export function Dashboard() {
         <div className="xl:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-              <Camera className="w-5 h-5 text-emerald-600" /> 
+              <Camera className="w-5 h-5 text-emerald-600" />
               Diagnostics Récents
             </h2>
             <Link to="/diagnostic" className="text-sm font-medium text-emerald-600 hover:text-emerald-700 flex items-center">
@@ -428,9 +432,9 @@ export function Dashboard() {
                       className="flex items-center p-4 sm:p-5 gap-4 sm:gap-6"
                     >
                       <div className="shrink-0 w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 rounded-xl overflow-hidden border border-slate-200">
-                        {d.image_url ? (
+                        {d.imageUrl || d.image_url ? (
                           <img
-                            src={d.image_url}
+                            src={d.imageUrl || d.image_url}
                             alt="Plante analysée"
                             className="w-full h-full object-cover"
                           />
@@ -440,28 +444,28 @@ export function Dashboard() {
                           </div>
                         )}
                       </div>
-                      
+
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 mb-1">
                           <p className="font-semibold text-slate-800 truncate">
-                            {d.disease_name || 'Analyse en cours...'}
+                            {d.diseaseName || d.disease_name || 'Analyse en cours...'}
                           </p>
-                          {d.disease_name?.toLowerCase() === 'healthy' && (
+                          {(d.diseaseName || d.disease_name)?.toLowerCase() === 'healthy' && (
                             <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-50 text-green-700">
                               Sain
                             </span>
                           )}
                         </div>
                         <div className="flex items-center text-xs text-slate-500 gap-3">
-                          <span>{new Date(d.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                          {d.severity && d.disease_name?.toLowerCase() !== 'healthy' && (
+                          <span>{new Date(d.createdAt || d.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                          {d.severity && (d.diseaseName || d.disease_name)?.toLowerCase() !== 'healthy' && (
                             <span className={`px-2.5 py-1 rounded-full border text-xs font-medium ${getSeverityColor(d.severity)}`}>
                               Gravité: {getSeverityLabel(d.severity)}
                             </span>
                           )}
                         </div>
                       </div>
-                      
+
                       <div className="shrink-0 text-slate-400">
                         <ChevronRight className="w-5 h-5" />
                       </div>
@@ -482,11 +486,11 @@ export function Dashboard() {
           <div>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">
-                <Sprout className="w-5 h-5 text-emerald-600" /> 
+                <Sprout className="w-5 h-5 text-emerald-600" />
                 Mes Cultures
               </h2>
             </div>
-            
+
             {crops.length === 0 ? (
               <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm text-center">
                 <Sprout className="w-10 h-10 text-slate-300 mx-auto mb-3" />
@@ -519,7 +523,7 @@ export function Dashboard() {
           <div className="bg-gradient-to-br from-emerald-800 to-emerald-900 rounded-2xl p-6 shadow-md text-white overflow-hidden relative group">
             <div className="absolute -right-6 -top-6 w-32 h-32 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-colors"></div>
             <h2 className="text-lg font-bold flex items-center gap-2 mb-3 relative z-10">
-              <FileText className="w-5 h-5 opacity-90" /> 
+              <FileText className="w-5 h-5 opacity-90" />
               Formations & Conseils
             </h2>
             <p className="text-emerald-100/90 text-sm leading-relaxed mb-5 relative z-10">

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { Package, Plus, Leaf, AlertTriangle, Edit2, Trash2, Search, Filter, BeakerIcon, Beaker } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { Package, Plus, Leaf, AlertTriangle, Edit2, Trash2, Search, Filter, Beaker } from 'lucide-react'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function ProductManagement() {
@@ -48,32 +48,15 @@ export function ProductManagement() {
     }
 
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (farm) {
-        const [fertilizersResult, phytoResult] = await Promise.all([
-          supabase
-            .from('fertilizers')
-            .select('*')
-            .eq('farm_id', farm.id)
-            .order('created_at', { ascending: false }),
-
-          supabase
-            .from('phyto_products')
-            .select('*')
-            .eq('farm_id', farm.id)
-            .order('created_at', { ascending: false })
+        const [fertRes, phytoRes] = await Promise.all([
+          get(`/fertilizers?farmId=${farm.id}`),
+          get(`/phyto_products?farmId=${farm.id}`)
         ])
-
-        if (fertilizersResult.error) throw fertilizersResult.error
-        if (phytoResult.error) throw phytoResult.error
-
-        setFertilizers(fertilizersResult.data || [])
-        setPhytoProducts(phytoResult.data || [])
+        setFertilizers(fertRes?.fertilizers || [])
+        setPhytoProducts(phytoRes?.phyto_products || [])
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des produits:', error)
@@ -85,12 +68,8 @@ export function ProductManagement() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (!farm) throw new Error('Ferme non trouvée')
 
       const productData = {
@@ -106,30 +85,16 @@ export function ProductManagement() {
       if (activeTab === 'fertilizers') {
         const { fertilizerData, ...phytoData } = productData
         if (editingProduct) {
-          const { error } = await supabase
-            .from('fertilizers')
-            .update(fertilizerData)
-            .eq('id', editingProduct.id)
-          if (error) throw error
+          await put(`/fertilizers/${editingProduct.id}`, fertilizerData)
         } else {
-          const { error } = await supabase
-            .from('fertilizers')
-            .insert(fertilizerData)
-          if (error) throw error
+          await post('/fertilizers', fertilizerData)
         }
       } else {
         const { phytoData, ...fertilizerData } = productData
         if (editingProduct) {
-          const { error } = await supabase
-            .from('phyto_products')
-            .update(phytoData)
-            .eq('id', editingProduct.id)
-          if (error) throw error
+          await put(`/phyto_products/${editingProduct.id}`, phytoData)
         } else {
-          const { error } = await supabase
-            .from('phyto_products')
-            .insert(phytoData)
-          if (error) throw error
+          await post('/phyto_products', phytoData)
         }
       }
 
@@ -189,12 +154,7 @@ export function ProductManagement() {
   const handleDelete = async (id) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
       try {
-        const { error } = await supabase
-          .from(activeTab === 'fertilizers' ? 'fertilizers' : 'phyto_products')
-          .delete()
-          .eq('id', id)
-
-        if (error) throw error
+        await del(`/${activeTab === 'fertilizers' ? 'fertilizers' : 'phyto_products'}/${id}`)
         fetchProducts()
       } catch (error) {
         console.error('Erreur lors de la suppression:', error)
@@ -275,7 +235,7 @@ export function ProductManagement() {
               : 'text-slate-600 hover:text-slate-800'
               }`}
           >
-            <BeakerIcon className="w-4 h-4 inline mr-2" />
+            <Beaker className="w-4 h-4 inline mr-2" />
             Engrais
           </button>
           <button

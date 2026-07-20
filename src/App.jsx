@@ -5,6 +5,7 @@ import { ProtectedRoute } from './components/ProtectedRoute.jsx'
 import { Home } from './pages/Home.jsx'
 import { Login } from './pages/Login.jsx'
 import { Signup } from './pages/Signup.jsx'
+import { ResetPassword } from './pages/ResetPassword.jsx'
 import { Dashboard } from './pages/Dashboard.jsx'
 import { DiagnosticUpload } from './pages/DiagnosticUpload.jsx'
 import { DiagnosticResult } from './pages/DiagnosticResult.jsx'
@@ -12,7 +13,6 @@ import { Market } from './pages/Market.jsx'
 import { Formations } from './pages/Formations.jsx'
 import { SoilAnalysis } from './pages/SoilAnalysis.jsx'
 import { Crops } from './pages/Crops.jsx'
-import { Farm } from './pages/Farm.jsx'
 import { FarmManagement } from './pages/FarmManagement.jsx'
 import { WeatherStation } from './pages/WeatherStation.jsx'
 import { TestConnection } from './pages/TestConnection.jsx'
@@ -33,6 +33,8 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
         {/* Public Routes with Main Layout */}
         <Route path="/" element={<MainLayout />}>
           <Route index element={<Home />} />
@@ -88,8 +90,22 @@ function App() {
               </ProtectedRoute>
             }
           />
-          <Route path="market" element={<Market />} />
-          <Route path="formations" element={<Formations />} />
+          <Route
+            path="market"
+            element={
+              <ProtectedRoute>
+                <Market />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="formations"
+            element={
+              <ProtectedRoute>
+                <Formations />
+              </ProtectedRoute>
+            }
+          />
           <Route
             path="orders"
             element={

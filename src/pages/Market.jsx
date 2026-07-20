@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react'
-import { ShoppingBag, Package, TrendingUp, Store, Plus, Check, X, Clock } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { ShoppingBag, Package, TrendingUp, Store, Plus, Check, X, Clock, AlertCircle } from 'lucide-react'
+import { get, post, del, put } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { getProductImage } from '../utils/productImages.js'
 import { getOrdersByClient, getOrdersByFarmer } from '../services/orders.js'
+import { getSupabaseConfigStatus } from '../utils/appConfig.js'
 
 export function Market() {
   const { user, loading: authLoading } = useAuth()
+  const supabaseStatus = getSupabaseConfigStatus()
 
   // Set default role. If not logged in, they are a 'guest'.
-  const role = user?.user_metadata?.role || (user ? 'farmer' : 'guest')
+  const role = user?.role || (user ? 'farmer' : 'guest')
 
   // Initialize tab state. 
   // If we don't know the role yet (or if guest/client), default differently.
@@ -32,6 +34,13 @@ export function Market() {
 
   return (
     <div className="space-y-6">
+      {supabaseStatus.configured === false && (
+        <div className="flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <span>{supabaseStatus.message}</span>
+        </div>
+      )}
+
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <h1 className="text-2xl font-bold text-emerald-900 flex items-center gap-2">
           <Store className="w-8 h-8 text-emerald-600" />
@@ -86,6 +95,7 @@ function FarmerProducts({ user }) {
   const [newPrice, setNewPrice] = useState('')
   const [newImage, setNewImage] = useState('')
   const [uploading, setUploading] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     fetchProducts()
@@ -93,76 +103,79 @@ function FarmerProducts({ user }) {
 
   async function fetchProducts() {
     setLoading(true)
-    const { data } = await supabase.from('products').select('*').eq('farmer_id', user.id).order('created_at', { ascending: false })
-    setProducts(data || [])
-    setLoading(false)
+    setError('')
+    try {
+      const res = await get(`/products?farmerId=${user.id}`)
+      setProducts(res.products || [])
+    } catch (err) {
+      console.error('Erreur chargement produits:', err)
+      setError('Impossible de charger vos produits depuis le backend.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function uploadImage(file) {
     if (!file) return null
+    const form = new FormData()
+    form.append('file', file)
+    form.append('path', `products/${user.id}`)
 
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Date.now()}.${fileExt}`
-    const filePath = `products/${user.id}/${fileName}`
-
-    const { error: uploadError } = await supabase.storage
-      .from('product-images')
-      .upload(filePath, file)
-
-    if (uploadError) {
-      console.error('Erreur upload:', uploadError)
-      return null
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('product-images')
-      .getPublicUrl(filePath)
-
-    return publicUrl
+    const uploadRes = await post('/upload', form, { headers: {} })
+    return uploadRes?.file?.url || null
   }
 
   async function handleDeleteProduct(productId) {
     const confirmDelete = confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')
     if (!confirmDelete) return
 
-    const { error } = await supabase.from('products').delete().eq('id', productId)
-
-    if (!error) {
+    try {
+      await del(`/products/${productId}`)
       setProducts(products.filter(p => p.id !== productId))
-    } else {
+    } catch (err) {
       alert('Erreur lors de la suppression du produit')
     }
   }
 
   async function handleAddProduct(e) {
     e.preventDefault()
-    if (!newTitle || !newPrice) return
+    if (!newTitle || !newPrice) {
+      setError('Indiquez au moins un nom et un prix pour le produit.')
+      return
+    }
 
     setUploading(true)
+    setError('')
 
     let imageUrl = null
     if (newImage) {
-      imageUrl = await uploadImage(newImage)
+      // Upload via backend
+      const form = new FormData()
+      form.append('file', newImage)
+      const uploadRes = await post('/upload', form, { headers: {} })
+      imageUrl = uploadRes?.file?.url
     }
 
-    const { data, error } = await supabase.from('products').insert([
-      {
-        farmer_id: user.id,
+    try {
+      const res = await post('/products', {
         title: newTitle,
         price: parseFloat(newPrice),
-        image_url: imageUrl || getProductImage(newTitle)
+        unit: 'FCFA/kg',
+        imageUrl: imageUrl || getProductImage(newTitle)
+      })
+      if (res?.product) {
+        setProducts([res.product, ...products])
+        setShowAddForm(false)
+        setNewTitle('')
+        setNewPrice('')
+        setNewImage('')
       }
-    ]).select()
-
-    if (!error && data) {
-      setProducts([data[0], ...products])
-      setShowAddForm(false)
-      setNewTitle('')
-      setNewPrice('')
-      setNewImage('')
+    } catch (err) {
+      console.error('Erreur insertion produit:', err)
+      setError('Une erreur est survenue pendant l’enregistrement du produit.')
+    } finally {
+      setUploading(false)
     }
-
-    setUploading(false)
   }
 
   return (
@@ -173,6 +186,10 @@ function FarmerProducts({ user }) {
           <Plus className="w-4 h-4" /> Ajouter
         </button>
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>
+      )}
 
       {showAddForm && (
         <form onSubmit={handleAddProduct} className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 space-y-4">
@@ -278,8 +295,12 @@ function FarmerSales({ user }) {
   }
 
   async function updateStatus(id, status) {
-    const { error } = await supabase.from('orders').update({ status }).eq('id', id)
-    if (!error) fetchOrders()
+    try {
+      await put(`/orders/${id}`, { status })
+      fetchOrders()
+    } catch (err) {
+      console.error('Erreur update status:', err)
+    }
   }
 
   if (loading) return <p className="text-center py-8 text-slate-500">Chargement...</p>
@@ -334,9 +355,15 @@ function ClientShop({ user }) {
 
   async function fetchProducts() {
     setLoading(true)
-    const { data } = await supabase.from('products').select('*').order('created_at', { ascending: false })
-    setProducts(data || [])
-    setLoading(false)
+    try {
+      const res = await get('/products')
+      setProducts(res?.products || [])
+    } catch (err) {
+      console.error('Erreur chargement boutique:', err)
+      setProducts([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleOrder(product) {
@@ -349,16 +376,22 @@ function ClientShop({ user }) {
     const confirmOrder = confirm(`Vous commandez ${quantity} kg pour un total de ${total_price.toLocaleString()} FCFA. Confirmer ?`)
     if (!confirmOrder) return
 
-    const { error } = await supabase.from('orders').insert([{
-      client_id: user.id,
-      farmer_id: product.farmer_id,
-      product_id: product.id,
-      quantity,
-      total_price
-    }])
-
-    if (error) alert("Erreur lors de la commande.")
-    else alert("Commande placée avec succès !")
+    try {
+      const res = await post('/orders', {
+        clientId: user.id,
+        farmerId: product.farmer_id,
+        productId: product.id,
+        quantity,
+        totalPrice: total_price,
+        status: 'pending',
+      })
+      if (res?.order) {
+        alert('Commande placée avec succès !')
+      }
+    } catch (err) {
+      console.error('Erreur lors de la commande:', err)
+      alert('Erreur lors de la commande. Vérifiez que le backend est accessible.')
+    }
   }
 
   if (loading) return <p className="text-center py-8 text-slate-500">Chargement des produits...</p>
@@ -471,49 +504,63 @@ function OfficialPrices() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.from('market_prices').select('*').order('region').then(({ data }) => setPrices(data || [])).finally(() => setLoading(false))
+    async function fetchPrices() {
+      setLoading(true)
+      try {
+        const res = await get('/national_prices')
+        setPrices(res?.prices || [])
+      } catch (err) {
+        console.error('Erreur chargement prix marché:', err)
+        setPrices([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPrices()
   }, [])
 
   if (loading) return <p className="text-center py-8 text-slate-500">Chargement des prix du marché...</p>
 
-  const byRegion = prices.reduce((acc, row) => {
-    const r = row.region || 'Autre'
-    if (!acc[r]) acc[r] = []
-    acc[r].push(row)
-    return acc
-  }, {})
-
   return (
     <div className="space-y-6">
-      {Object.entries(byRegion).map(([region, items]) => (
-        <section key={region} className="bg-white rounded-2xl border border-emerald-100 p-5">
-          <h2 className="font-semibold text-emerald-900 border-b border-emerald-50 pb-3 mb-3">{region}</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {items.map(item => (
-              <div key={item.id} className="bg-white border border-slate-200 rounded-lg overflow-hidden hover:shadow-md transition-shadow">
-                <div className="h-24 bg-slate-50 overflow-hidden">
-                  <img
-                    src={getProductImage(item.product)}
-                    alt={item.product}
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      e.target.src = '/src/assets/products/default.jpg'
-                    }}
-                  />
+      {prices.length === 0 ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white p-8 text-center text-sm text-slate-500">
+          Aucun prix de référence n’est encore disponible dans la base de données.
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {prices.map((item) => (
+            <div key={item.id} className="rounded-2xl border border-emerald-100 bg-white p-4 shadow-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <p className="font-semibold text-slate-900">{item.product_name}</p>
+                  <p className="text-sm text-slate-500">{item.product_category}</p>
                 </div>
-                <div className="p-3">
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium text-slate-700">{item.product}</span>
-                    <span className="text-emerald-700 font-bold text-sm">
-                      {item.price_per_kg != null ? `${Number(item.price_per_kg).toLocaleString('fr-FR')} ${item.unit || 'FCFA'}/kg` : '—'}
-                    </span>
-                  </div>
-                </div>
+                <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                  {item.status || 'actif'}
+                </span>
               </div>
-            ))}
-          </div>
-        </section>
-      ))}
+              <div className="mt-4 flex items-end justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-slate-400">Prix de référence</p>
+                  <p className="text-2xl font-bold text-emerald-700">
+                    {Number(item.reference_price).toLocaleString('fr-FR')} {item.unit}
+                  </p>
+                </div>
+                <img
+                  src={getProductImage(item.product_name)}
+                  alt={item.product_name}
+                  className="h-16 w-16 rounded-xl object-cover"
+                  onError={(e) => {
+                    e.target.src = 'https://images.unsplash.com/photo-1586201375761-83865001e31d?w=400&h=300&fit=crop&crop=center&auto=format'
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { getSupabaseConfigStatus } from '../utils/appConfig.js'
 import {
   Leaf,
   Camera,
@@ -18,6 +19,7 @@ import { useAuth } from '../hooks/useAuth.js'
 export function Home() {
   const { user } = useAuth()
   const { hash } = useLocation()
+  const supabaseStatus = getSupabaseConfigStatus()
 
   useEffect(() => {
     if (hash) {
@@ -43,7 +45,12 @@ export function Home() {
             Diagnostic des maladies par photo, prix du marché en temps réel et formations pratiques.
             Simple, rapide, sur votre téléphone.
           </p>
-          {user && user?.user_metadata?.role !== 'client' ? (
+          {!supabaseStatus.configured && (
+            <div className="mx-auto mt-6 max-w-2xl rounded-2xl border border-white/20 bg-white/10 px-4 py-3 text-sm text-white/95 backdrop-blur-sm">
+              {supabaseStatus.message}
+            </div>
+          )}
+          {user && user?.role !== 'client' ? (
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/diagnostic"
@@ -60,7 +67,7 @@ export function Home() {
                 Mon tableau de bord
               </Link>
             </div>
-          ) : user?.user_metadata?.role === 'client' ? (
+          ) : user?.role === 'client' ? (
             <div className="mt-10 flex flex-col sm:flex-row gap-4 justify-center">
               <Link
                 to="/market"
@@ -267,7 +274,7 @@ export function Home() {
               </Link>
             </div>
           )}
-          {user && user?.user_metadata?.role !== 'client' && (
+          {user && user?.role !== 'client' && (
             <Link
               to="/diagnostic"
               className="mt-10 landing-cta-primary inline-flex items-center justify-center gap-2 min-h-[52px] px-8 py-3 rounded-2xl font-semibold text-lg"
@@ -276,7 +283,7 @@ export function Home() {
               Nouveau diagnostic
             </Link>
           )}
-          {user && user?.user_metadata?.role === 'client' && (
+          {user && user?.role === 'client' && (
             <Link
               to="/market"
               className="mt-10 landing-cta-primary inline-flex items-center justify-center gap-2 min-h-[52px] px-8 py-3 rounded-2xl font-semibold text-lg"

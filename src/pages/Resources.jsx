@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Package, Droplets, Calendar, TrendingUp, BarChart3, Settings, Database, BeakerIcon, Beaker } from 'lucide-react'
+import { Package, Droplets, Calendar, TrendingUp, BarChart3, Settings, Database, Beaker } from 'lucide-react'
 import { IrrigationTracker } from '../components/IrrigationTracker.jsx'
 import { ProductManagement } from '../components/ProductManagement.jsx'
 import { InterventionPlanning } from '../components/InterventionPlanning.jsx'
@@ -33,7 +33,7 @@ export function Resources() {
     {
       id: 'tracking',
       name: 'Traçabilité',
-      icon: BeakerIcon,
+      icon: Beaker,
       component: TreatmentTracking,
       description: 'Suivi des traitements appliqués'
     }

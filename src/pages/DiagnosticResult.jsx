@@ -13,7 +13,7 @@ export function DiagnosticResult() {
 
   useEffect(() => {
     if (!user || !id) return
-    getDiagnosticById(id, user.id)
+    getDiagnosticById(id)
       .then(setDiagnostic)
       .catch((err) => setError(err.message))
       .finally(() => setLoading(false))
@@ -38,9 +38,15 @@ export function DiagnosticResult() {
     )
   }
 
-  const severityColor = diagnostic.severity === 'elevee' || diagnostic.severity === 'élevée'
+  const diseaseName = diagnostic.diseaseName || diagnostic.disease_name
+  const imageUrl = diagnostic.imageUrl || diagnostic.image_url
+  const solution = diagnostic.solution || diagnostic.treatment
+  const ecoAlternative = diagnostic.ecoAlternative || diagnostic.eco_treatment || diagnostic.eco_alternative
+  const severity = diagnostic.severity
+
+  const severityColor = severity === 'elevee' || severity === 'élevée' || severity === 'high'
     ? 'bg-red-100 text-red-800'
-    : diagnostic.severity === 'moderee' || diagnostic.severity === 'modérée'
+    : severity === 'moderee' || severity === 'modérée' || severity === 'medium'
       ? 'bg-amber-100 text-amber-800'
       : 'bg-emerald-100 text-emerald-800'
 
@@ -52,23 +58,23 @@ export function DiagnosticResult() {
 
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-emerald-900">Diagnostic agricole</h1>
-        <span className={'inline-block px-3 py-1 rounded-full text-sm font-medium ' + severityColor}>
-          {diagnostic.severity}
-        </span>
+        {severity && (
+          <span className={'inline-block px-3 py-1 rounded-full text-sm font-medium ' + severityColor}>
+            {severity}
+          </span>
+        )}
       </div>
 
-      {/* Image analysée */}
-      {diagnostic.image_url && (
+      {imageUrl && (
         <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 overflow-hidden">
           <img
-            src={diagnostic.image_url}
+            src={imageUrl}
             alt="Plante analysée"
             className="w-full h-64 object-cover"
           />
         </div>
       )}
 
-      {/* Carte principale - Maladie */}
       <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
         <div className="flex items-center gap-3 mb-4">
           <div className="bg-red-100 p-3 rounded-xl">
@@ -76,86 +82,89 @@ export function DiagnosticResult() {
           </div>
           <div>
             <h2 className="text-lg font-semibold text-slate-900">Maladie identifiée</h2>
-            <p className="text-xl font-bold text-emerald-900">{diagnostic.disease_name}</p>
+            <p className="text-xl font-bold text-emerald-900">{diseaseName || 'Non identifiée'}</p>
           </div>
         </div>
       </div>
 
-      {/* Symptômes */}
-      <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Leaf className="w-5 h-5 text-emerald-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Symptômes observés</h3>
-        </div>
-        <p className="text-slate-700 leading-relaxed">{diagnostic.symptoms}</p>
-      </div>
-
-      {/* Cause */}
-      <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <AlertTriangle className="w-5 h-5 text-amber-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Cause probable</h3>
-        </div>
-        <p className="text-slate-700 leading-relaxed">{diagnostic.cause}</p>
-      </div>
-
-      {/* Traitements */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Traitement chimique */}
+      {solution && (
         <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
           <div className="flex items-center gap-2 mb-3">
             <Droplets className="w-5 h-5 text-blue-600" />
-            <h3 className="text-lg font-semibold text-slate-900">Traitement chimique</h3>
+            <h3 className="text-lg font-semibold text-slate-900">Traitement recommandé</h3>
           </div>
-          <p className="text-slate-700 leading-relaxed">{diagnostic.treatment}</p>
+          <p className="text-slate-700 leading-relaxed">{solution}</p>
           <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100">
             <p className="text-xs text-blue-700 font-medium">
-              ⚠️ Respecter les doses et les précautions d'usage
+              Respecter les doses et les précautions d'usage
             </p>
           </div>
         </div>
+      )}
 
-        {/* Traitement écologique */}
+      {ecoAlternative && (
         <div className="bg-emerald-50 rounded-2xl shadow-sm border border-emerald-200 p-6">
           <div className="flex items-center gap-2 mb-3">
             <Sprout className="w-5 h-5 text-emerald-600" />
-            <h3 className="text-lg font-semibold text-emerald-900">Traitement biologique</h3>
+            <h3 className="text-lg font-semibold text-emerald-900">Alternative écologique</h3>
           </div>
-          <p className="text-emerald-800 leading-relaxed">{diagnostic.eco_treatment}</p>
+          <p className="text-emerald-800 leading-relaxed">{ecoAlternative}</p>
           <div className="mt-3 p-3 bg-emerald-100 rounded-lg border border-emerald-200">
             <p className="text-xs text-emerald-700 font-medium">
-              🌿 Solution naturelle et économique
+              Solution naturelle et économique
             </p>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Prévention */}
-      <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Shield className="w-5 h-5 text-purple-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Mesures préventives</h3>
-        </div>
-        <p className="text-slate-700 leading-relaxed">{diagnostic.prevention}</p>
-      </div>
+      {(diagnostic.symptoms || diagnostic.cause || diagnostic.prevention || diagnostic.cultural_practices) && (
+        <>
+          {diagnostic.symptoms && (
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Leaf className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-lg font-semibold text-slate-900">Symptômes observés</h3>
+              </div>
+              <p className="text-slate-700 leading-relaxed">{diagnostic.symptoms}</p>
+            </div>
+          )}
 
-      {/* Pratiques culturales */}
-      <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
-        <div className="flex items-center gap-2 mb-3">
-          <Leaf className="w-5 h-5 text-emerald-600" />
-          <h3 className="text-lg font-semibold text-slate-900">Pratiques culturales recommandées</h3>
-        </div>
-        <p className="text-slate-700 leading-relaxed">{diagnostic.cultural_practices}</p>
-      </div>
+          {diagnostic.cause && (
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-amber-600" />
+                <h3 className="text-lg font-semibold text-slate-900">Cause probable</h3>
+              </div>
+              <p className="text-slate-700 leading-relaxed">{diagnostic.cause}</p>
+            </div>
+          )}
 
-      {/* Actions */}
+          {diagnostic.prevention && (
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Shield className="w-5 h-5 text-purple-600" />
+                <h3 className="text-lg font-semibold text-slate-900">Mesures préventives</h3>
+              </div>
+              <p className="text-slate-700 leading-relaxed">{diagnostic.prevention}</p>
+            </div>
+          )}
+
+          {diagnostic.cultural_practices && (
+            <div className="bg-white rounded-2xl shadow-sm border border-emerald-100 p-6">
+              <div className="flex items-center gap-2 mb-3">
+                <Leaf className="w-5 h-5 text-emerald-600" />
+                <h3 className="text-lg font-semibold text-slate-900">Pratiques culturales recommandées</h3>
+              </div>
+              <p className="text-slate-700 leading-relaxed">{diagnostic.cultural_practices}</p>
+            </div>
+          )}
+        </>
+      )}
+
       <div className="flex gap-4">
-        <Link to={user?.user_metadata?.role === 'client' ? "/dashboard" : "/diagnostic"} className="flex-1 min-h-[48px] px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-center hover:bg-emerald-700">
-          {user?.user_metadata?.role === 'client' ? "Retour au tableau de bord" : "Nouveau diagnostic"}
+        <Link to={user?.role === 'client' ? "/dashboard" : "/diagnostic"} className="flex-1 min-h-[48px] px-6 py-3 rounded-xl bg-emerald-600 text-white font-semibold text-center hover:bg-emerald-700">
+          {user?.role === 'client' ? "Retour au tableau de bord" : "Nouveau diagnostic"}
         </Link>
-        <button className="px-6 py-3 rounded-xl border border-emerald-600 text-emerald-600 font-semibold hover:bg-emerald-50">
-          📋 Exporter le rapport
-        </button>
       </div>
     </div>
   )

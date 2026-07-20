@@ -171,8 +171,8 @@ export function DiagnosticText() {
       {/* Header */}
       <div className="text-center">
         <div className="mb-4">
-          <Link to={user?.user_metadata?.role === 'client' ? "/dashboard" : "/diagnostic"} className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-medium">
-            ← Retour {user?.user_metadata?.role === 'client' ? "au tableau de bord" : "au diagnostic"}
+          <Link to={user?.role === 'client' ? "/dashboard" : "/diagnostic"} className="inline-flex items-center gap-2 text-emerald-600 hover:text-emerald-700 font-medium">
+            ← Retour {user?.role === 'client' ? "au tableau de bord" : "au diagnostic"}
           </Link>
         </div>
         <h1 className="text-2xl font-bold text-emerald-900 mb-2">Diagnostic par Description</h1>

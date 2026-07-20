@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Sprout, Plus, Calendar, Ruler, ClipboardList, PenLine, Trash2, Check, X } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { getProductImage } from '../utils/productImages.js'
 
@@ -35,13 +35,8 @@ export function Crops() {
 
     setLoading(true)
     try {
-      const { data, error } = await supabase.from('crops').select('*').eq('user_id', user.id).order('created_at', { ascending: false })
-      if (error) {
-        console.error('Erreur lors du chargement des cultures:', error)
-        setCrops([])
-      } else {
-        setCrops(data || [])
-      }
+      const res = await get(`/crops?userId=${user.id}`)
+      setCrops(res?.crops || [])
     } catch (error) {
       console.error('Erreur inattendue:', error)
       setCrops([])
@@ -75,9 +70,11 @@ export function Crops() {
 
   async function handleDelete(id) {
     if (!confirm('Êtes-vous sûr de vouloir supprimer cette culture ?')) return
-    const { error } = await supabase.from('crops').delete().eq('id', id)
-    if (!error) {
+    try {
+      await del(`/crops/${id}`)
       setCrops(crops.filter(c => c.id !== id))
+    } catch (err) {
+      console.error('Erreur suppression culture:', err)
     }
   }
 
@@ -95,24 +92,29 @@ export function Crops() {
     }
 
     if (editingId) {
-      const { data, error } = await supabase.from('crops').update(payload).eq('id', editingId).select()
-      if (error) {
-        console.error("Erreur de modification :", error)
-        alert("Erreur lors de la modification: " + error.message)
-      } else if (data) {
-        setCrops(crops.map(c => c.id === editingId ? data[0] : c))
-        resetForm()
+      try {
+        const res = await put(`/crops/${editingId}`, payload)
+        const updated = res?.crop
+        if (updated) {
+          setCrops(crops.map(c => c.id === editingId ? updated : c))
+          resetForm()
+        }
+      } catch (err) {
+        console.error("Erreur de modification :", err)
+        alert("Erreur lors de la modification: " + err.message)
       }
     } else {
-      const { data, error } = await supabase.from('crops').insert([payload]).select()
-      if (error) {
-        console.error("Erreur d'ajout :", error)
-        alert("Erreur lors de l'ajout (la base de données n'est peut-être pas à jour) : " + error.message)
-      } else if (data) {
-        setCrops([data[0], ...crops])
-        resetForm()
-        // Forcer le rafraîchissement pour s'assurer que les données sont à jour
-        setTimeout(() => fetchCrops(), 100)
+      try {
+        const res = await post('/crops', payload)
+        const created = res?.crop
+        if (created) {
+          setCrops([created, ...crops])
+          resetForm()
+          setTimeout(() => fetchCrops(), 100)
+        }
+      } catch (err) {
+        console.error("Erreur d'ajout :", err)
+        alert("Erreur lors de l'ajout (la base de données n'est peut-être pas à jour) : " + err.message)
       }
     }
     setSubmitting(false)

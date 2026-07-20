@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth.js'
-import { supabase } from '../lib/supabase.js'
+import { get, post, del } from '../lib/api.js'
 
 export function TestConnection() {
   const { user } = useAuth()
@@ -26,82 +26,67 @@ export function TestConnection() {
         return
       }
 
-      // Test 2: Tester la connexion à Supabase
-      const { data, error } = await supabase.from('farms').select('count').single()
-      if (error) {
-        addLog(`❌ Erreur connexion Supabase: ${error.message}`, 'error')
-      } else {
-        addLog('✅ Connexion Supabase réussie', 'success')
+      // Test 2: Tester la connexion au backend (liste farms)
+      try {
+        const farmsRes = await get('/farms?limit=1')
+        addLog('✅ Connexion backend (farms) réussie', 'success')
+      } catch (err) {
+        addLog(`❌ Erreur connexion backend: ${err.message}`, 'error')
       }
 
-      // Test 3: Tester l'insertion dans farms
-      addLog('🏡 Test insertion dans farms...', 'info')
-      const { data: farmData, error: farmError } = await supabase
-        .from('farms')
-        .insert({
-          user_id: user.id,
-          farm_name: `Ferme test ${Date.now()}`,
+      // Test 3: Tester l'insertion dans farms via backend
+      addLog('🏡 Test insertion dans farms (backend)...', 'info')
+      try {
+        const farmRes = await post('/farms', {
+          userId: user.id,
+          farmName: `Ferme test ${Date.now()}`,
           region: 'Test',
           notes: 'Test de connexion'
         })
-        .select()
-
-      if (farmError) {
-        if (farmError.message.includes('duplicate key')) {
-          addLog('⚠️ Ferme existe déjà - Test normal', 'info')
-          addLog('✅ Contrainte unique fonctionne correctement', 'success')
-        } else {
-          addLog(`❌ Erreur insertion farms: ${farmError.message}`, 'error')
-          addLog(`🔍 Détails erreur: ${JSON.stringify(farmError.details)}`, 'error')
+        const created = farmRes?.farm
+        if (created) {
+          addLog('✅ Insertion farms réussie', 'success')
+          addLog(`📋 Farm ID: ${created.id}`, 'success')
+          // Nettoyer le test
+          await del(`/farms/${created.id}`)
+          addLog('🧹 Test nettoyé', 'info')
         }
-      } else {
-        addLog('✅ Insertion farms réussie', 'success')
-        addLog(`📋 Farm ID: ${farmData[0]?.id}`, 'success')
-
-        // Nettoyer le test
-        await supabase.from('farms').delete().eq('id', farmData[0].id)
-        addLog('🧹 Test nettoyé', 'info')
+      } catch (err) {
+        addLog(`❌ Erreur insertion farms: ${err.message}`, 'error')
       }
 
       // Test 4: Vérifier la structure de la table diagnostics
       addLog('🔬 Vérification structure diagnostics...', 'info')
-      const { data: columnsData, error: columnsError } = await supabase
-        .from('diagnostics')
-        .select('*')
-        .limit(1)
+      // Vérifier diagnostics via backend
+      try {
+        const cols = await get('/diagnostics?limit=1')
+        addLog('✅ Structure diagnostics correcte (backend)', 'success')
 
-      if (columnsError && columnsError.message.includes('column')) {
-        addLog(`❌ Colonne manquante dans diagnostics: ${columnsError.message}`, 'error')
-        addLog('🔧 Exécutez la migration 20250310000019_fix_test_errors.sql', 'info')
-      } else {
-        addLog('✅ Structure diagnostics correcte', 'success')
-
-        // Test 5: Tester l'insertion dans diagnostics
-        addLog('🔬 Test insertion dans diagnostics...', 'info')
-        const { data: diagData, error: diagError } = await supabase
-          .from('diagnostics')
-          .insert({
-            user_id: user.id,
-            disease_name: `Test maladie ${Date.now()}`,
+        // Test 5: Tester l'insertion dans diagnostics via backend
+        addLog('🔬 Test insertion dans diagnostics (backend)...', 'info')
+        try {
+          const diagRes = await post('/diagnostics', {
+            userId: user.id,
+            diseaseName: `Test maladie ${Date.now()}`,
             symptoms: 'Test symptômes',
             cause: 'Test cause',
             severity: 'faible',
             treatment: 'Test traitement',
-            eco_treatment: 'Test eco traitement',
+            ecoTreatment: 'Test eco traitement',
             prevention: 'Test prévention',
-            cultural_practices: 'Test pratiques'
+            culturalPractices: 'Test pratiques'
           })
-          .select()
-
-        if (diagError) {
-          addLog(`❌ Erreur insertion diagnostics: ${diagError.message}`, 'error')
-        } else {
-          addLog('✅ Insertion diagnostics réussie', 'success')
-
-          // Nettoyer le test
-          await supabase.from('diagnostics').delete().eq('id', diagData[0].id)
-          addLog('🧹 Diagnostic test nettoyé', 'info')
+          const createdDiag = diagRes?.diagnostic
+          if (createdDiag) {
+            addLog('✅ Insertion diagnostics réussie', 'success')
+            await del(`/diagnostics/${createdDiag.id}`)
+            addLog('🧹 Diagnostic test nettoyé', 'info')
+          }
+        } catch (err) {
+          addLog(`❌ Erreur insertion diagnostics: ${err.message}`, 'error')
         }
+      } catch (err) {
+        addLog(`❌ Erreur lecture diagnostics: ${err.message}`, 'error')
       }
 
       addLog('🎉 Tests terminés!', 'success')

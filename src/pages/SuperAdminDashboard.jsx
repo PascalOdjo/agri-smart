@@ -20,7 +20,7 @@ import {
   Store,
   Warehouse
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function SuperAdminDashboard() {
@@ -37,7 +37,7 @@ export function SuperAdminDashboard() {
   const [stats, setStats] = useState({})
 
   // Check if user is super admin
-  const isSuperAdmin = user?.user_metadata?.role === 'admin'
+  const isSuperAdmin = user?.role === 'admin'
 
   useEffect(() => {
     if (!isSuperAdmin) return
@@ -94,46 +94,19 @@ export function SuperAdminDashboard() {
 
   const fetchUsers = async () => {
     try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        // Si la table n'existe pas, retourner des données de test
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          console.log('Table profiles non trouvée, utilisation des données réelles (0 utilisateur)')
-          return []
-        }
-        throw error
-      }
-
-      // Utiliser les vraies données de Supabase si elles existent
-      if (data && data.length > 0) {
-        console.log('Utilisation des données réelles de Supabase:', data.length, 'utilisateurs')
-        return data
-      }
-
-      // Si la table est vide, ne PAS utiliser les données de test
-      console.log('Table profiles vide, utilisation des données réelles (0 utilisateur)')
-      return [] // Retourner un tableau vide pour utiliser les vraies données
+      const res = await get('/users')
+      return res?.users || []
     } catch (error) {
       console.error('Erreur utilisateurs:', error)
-      return [] // Retourner un tableau vide en cas d'erreur
+      return []
     }
   }
 
   const fetchProducts = async () => {
     try {
-      // Essayer de récupérer les prix nationaux d'abord
-      const { data: nationalPrices, error: nationalError } = await supabase
-        .from('national_prices')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      if (!nationalError && nationalPrices && nationalPrices.length > 0) {
-        // Transformer les prix nationaux en format de produits
+      const res = await get('/national_prices?status=active')
+      const nationalPrices = res?.national_prices || []
+      if (nationalPrices.length > 0) {
         const formattedProducts = nationalPrices.map(price => ({
           id: price.id,
           title: price.product_name,
@@ -141,38 +114,17 @@ export function SuperAdminDashboard() {
           category: price.product_category,
           price: price.reference_price,
           unit: price.unit,
-          stock: 999999, // Stock illimité pour les prix nationaux
-          farmer_id: null, // Prix national, pas de farmer spécifique
+          stock: 999999,
+          farmer_id: null,
           created_at: price.created_at,
           image: null,
           is_national_price: true
         }))
-        console.log('Utilisation des prix nationaux réels:', formattedProducts.length, 'produits')
         return formattedProducts
       }
 
-      // Si pas de prix nationaux, essayer la table products
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          return getTestProducts()
-        }
-        throw error
-      }
-
-      // Si on a des données réelles dans products, les utiliser
-      if (data && data.length > 0) {
-        console.log('Utilisation des produits réels de Supabase:', data.length, 'produits')
-        return data
-      }
-
-      // Si table vide mais existe, ne PAS utiliser les données de test
-      console.log('Table products vide, utilisation des données réelles (0 produit)')
-      return [] // Retourner un tableau vide pour utiliser les vraies données
+      const productsRes = await get('/products')
+      return productsRes?.products || []
     } catch (error) {
       console.error('Erreur produits:', error)
       return getTestProducts()
@@ -181,19 +133,8 @@ export function SuperAdminDashboard() {
 
   const fetchRegions = async () => {
     try {
-      const { data, error } = await supabase
-        .from('regions')
-        .select('*')
-        .order('name', { ascending: true })
-
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          return []
-        }
-        throw error
-      }
-
-      return data || []
+      const res = await get('/regions')
+      return res?.regions || []
     } catch (error) {
       console.error('Erreur régions:', error)
       return []
@@ -202,20 +143,8 @@ export function SuperAdminDashboard() {
 
   const fetchNationalPrices = async () => {
     try {
-      const { data, error } = await supabase
-        .from('national_prices')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          return []
-        }
-        throw error
-      }
-
-      return data || []
+      const res = await get('/national_prices?status=active')
+      return res?.national_prices || []
     } catch (error) {
       console.error('Erreur prix nationaux:', error)
       return []
@@ -224,20 +153,8 @@ export function SuperAdminDashboard() {
 
   const fetchRegionalAdjustments = async () => {
     try {
-      const { data, error } = await supabase
-        .from('regional_price_adjustments')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          return []
-        }
-        throw error
-      }
-
-      return data || []
+      const res = await get('/regional_price_adjustments?status=active')
+      return res?.regional_price_adjustments || []
     } catch (error) {
       console.error('Erreur ajustements régionaux:', error)
       return []
@@ -707,29 +624,8 @@ function ProductsTab({ products, regions }) {
     }
 
     try {
-      // Essayer de supprimer des prix nationaux d'abord
-      const { error } = await supabase
-        .from('national_prices')
-        .delete()
-        .eq('id', productId)
-
-      if (!error) {
-        // Rafraîchir les données
-        window.location.reload()
-      } else {
-        // Essayer de supprimer de la table products
-        const { error: productsError } = await supabase
-          .from('products')
-          .delete()
-          .eq('id', productId)
-
-        if (!productsError) {
-          window.location.reload()
-        } else {
-          console.error('Erreur lors de la suppression:', error)
-          alert('Erreur lors de la suppression du produit')
-        }
-      }
+      await del(`/national_prices/${productId}`)
+      window.location.reload()
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
       alert('Erreur lors de la suppression du produit')
@@ -857,31 +753,16 @@ function ProductsTab({ products, regions }) {
               try {
                 if (editingProduct) {
                   // Modifier le produit
-                  const { error } = await supabase
-                    .from('national_prices')
-                    .update(productData)
-                    .eq('id', editingProduct.id)
-
-                  if (!error) {
-                    alert('Produit modifié avec succès')
-                    setShowAddForm(false)
-                    window.location.reload()
-                  } else {
-                    alert('Erreur lors de la modification')
-                  }
+                  await put(`/national_prices/${editingProduct.id}`, productData)
+                  alert('Produit modifié avec succès')
+                  setShowAddForm(false)
+                  window.location.reload()
                 } else {
                   // Ajouter un nouveau produit
-                  const { error } = await supabase
-                    .from('national_prices')
-                    .insert(productData)
-
-                  if (!error) {
-                    alert('Produit ajouté avec succès')
-                    setShowAddForm(false)
-                    window.location.reload()
-                  } else {
-                    alert('Erreur lors de l\'ajout')
-                  }
+                  await post('/national_prices', productData)
+                  alert('Produit ajouté avec succès')
+                  setShowAddForm(false)
+                  window.location.reload()
                 }
               } catch (error) {
                 console.error('Erreur:', error)

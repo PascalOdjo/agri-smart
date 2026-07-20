@@ -1,35 +1,11 @@
-import { supabase } from '../lib/supabase.js'
+import { get, post, put } from '../lib/api.js'
 
 // Récupérer toutes les commandes d'un client
 export const getOrdersByClient = async (clientId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          product_name,
-          product_image,
-          quantity,
-          unit_price,
-          total_price
-        )
-      `)
-      .eq('client_id', clientId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      // Si la table n'existe pas, retourner des données de test
-      if (error.code === 'PGRST116' || error.message.includes('relation') || error.message.includes('does not exist')) {
-        console.log('Table orders non trouvée, utilisation des données de test')
-        return getTestOrders(clientId)
-      }
-      throw error
-    }
-
-    return data || []
+    const res = await get(`/orders`)
+    if (!res?.orders) return getTestOrders(clientId)
+    return res.orders
   } catch (error) {
     console.error('Erreur lors de la récupération des commandes:', error)
     // En cas d'erreur, retourner des données de test pour le développement
@@ -40,25 +16,8 @@ export const getOrdersByClient = async (clientId) => {
 // Récupérer une commande spécifique avec ses détails
 export const getOrderById = async (orderId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          product_name,
-          product_image,
-          quantity,
-          unit_price,
-          total_price
-        )
-      `)
-      .eq('id', orderId)
-      .single()
-
-    if (error) throw error
-    return data
+    const res = await get(`/orders/${orderId}`)
+    return res.order
   } catch (error) {
     console.error('Erreur lors de la récupération de la commande:', error)
     throw error
@@ -68,50 +27,8 @@ export const getOrderById = async (orderId) => {
 // Créer une nouvelle commande
 export const createOrder = async (orderData) => {
   try {
-    // D'abord créer la commande
-    const { data: order, error: orderError } = await supabase
-      .from('orders')
-      .insert({
-        client_id: orderData.client_id,
-        farmer_id: orderData.farmer_id,
-        farmer_name: orderData.farmer_name,
-        farmer_phone: orderData.farmer_phone,
-        farmer_location: orderData.farmer_location,
-        status: 'pending',
-        delivery_fee: orderData.delivery_fee || 0,
-        delivery_name: orderData.delivery_name,
-        delivery_address: orderData.delivery_address,
-        delivery_phone: orderData.delivery_phone,
-        delivery_email: orderData.delivery_email,
-        delivery_date: orderData.delivery_date,
-        notes: orderData.notes
-      })
-      .select()
-      .single()
-
-    if (orderError) throw orderError
-
-    // Ensuite ajouter les articles de la commande
-    const orderItems = orderData.items.map(item => ({
-      order_id: order.id,
-      product_id: item.product_id,
-      product_name: item.name,
-      product_image: item.image,
-      quantity: item.quantity,
-      unit_price: item.price,
-      total_price: item.quantity * item.price
-    }))
-
-    const { data: items, error: itemsError } = await supabase
-      .from('order_items')
-      .insert(orderItems)
-      .select()
-
-    if (itemsError) throw itemsError
-
-    // Récupérer la commande complète avec les articles
-    const fullOrder = await getOrderById(order.id)
-    return fullOrder
+    const res = await post('/orders', orderData)
+    return res.order
   } catch (error) {
     console.error('Erreur lors de la création de la commande:', error)
     throw error
@@ -121,25 +38,8 @@ export const createOrder = async (orderData) => {
 // Mettre à jour le statut d'une commande (pour les agriculteurs)
 export const updateOrderStatus = async (orderId, status, farmerId) => {
   try {
-    const updateData = { status }
-
-    // Ajouter les timestamps selon le statut
-    if (status === 'shipped') {
-      updateData.shipped_at = new Date().toISOString()
-    } else if (status === 'delivered') {
-      updateData.delivered_at = new Date().toISOString()
-    }
-
-    const { data, error } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderId)
-      .eq('farmer_id', farmerId) // S'assurer que seul l'agriculteur concerné peut modifier
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    const res = await put(`/orders/${orderId}/status`, { status })
+    return res.order
   } catch (error) {
     console.error('Erreur lors de la mise à jour du statut:', error)
     throw error
@@ -149,20 +49,8 @@ export const updateOrderStatus = async (orderId, status, farmerId) => {
 // Ajouter un numéro de suivi
 export const addTrackingNumber = async (orderId, trackingNumber, farmerId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({
-        tracking_number: trackingNumber,
-        status: 'shipped',
-        shipped_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-      .eq('farmer_id', farmerId)
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    const res = await put(`/orders/${orderId}/status`, { status: 'shipped', trackingNumber })
+    return res.order
   } catch (error) {
     console.error('Erreur lors de l\'ajout du numéro de suivi:', error)
     throw error
@@ -172,20 +60,8 @@ export const addTrackingNumber = async (orderId, trackingNumber, farmerId) => {
 // Annuler une commande (pour les clients)
 export const cancelOrder = async (orderId, clientId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .update({
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', orderId)
-      .eq('client_id', clientId)
-      .eq('status', 'pending') // Ne peut annuler que les commandes en attente
-      .select()
-      .single()
-
-    if (error) throw error
-    return data
+    const res = await put(`/orders/${orderId}/cancel`)
+    return res.order
   } catch (error) {
     console.error('Erreur lors de l\'annulation de la commande:', error)
     throw error
@@ -195,34 +71,11 @@ export const cancelOrder = async (orderId, clientId) => {
 // Récupérer les commandes d'un agriculteur
 export const getOrdersByFarmer = async (farmerId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_name,
-          quantity,
-          unit_price,
-          total_price
-        )
-      `)
-      .eq('farmer_id', farmerId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      // Si la table n'existe pas, retourner des données de test
-      if (error.code === 'PGRST116' || error.message.includes('relation') || error.message.includes('does not exist')) {
-        console.log('Table orders non trouvée, utilisation des données de test')
-        return getTestFarmerOrders(farmerId)
-      }
-      throw error
-    }
-
-    return data || []
+    // Backend scopes orders by the authenticated farmer via /orders
+    const res = await get('/orders')
+    return res?.orders || []
   } catch (error) {
     console.error('Erreur lors de la récupération des commandes agriculteur:', error)
-    // En cas d'erreur, retourner des données de test pour le développement
     return getTestFarmerOrders(farmerId)
   }
 }
@@ -230,25 +83,17 @@ export const getOrdersByFarmer = async (farmerId) => {
 // Obtenir les statistiques des commandes pour un client
 export const getClientOrderStats = async (clientId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('status, total_amount, created_at')
-      .eq('client_id', clientId)
-
-    if (error) throw error
-
-    const stats = {
-      total: data.length,
-      pending: data.filter(o => o.status === 'pending').length,
-      processing: data.filter(o => o.status === 'processing').length,
-      shipped: data.filter(o => o.status === 'shipped').length,
-      delivered: data.filter(o => o.status === 'delivered').length,
-      cancelled: data.filter(o => o.status === 'cancelled').length,
-      totalSpent: data.reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      averageOrderValue: data.length > 0 ? data.reduce((sum, o) => sum + (o.total_amount || 0), 0) / data.length : 0
+    const res = await get(`/clients/${clientId}/orders/stats`)
+    return res?.stats || {
+      total: 0,
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      totalSpent: 0,
+      averageOrderValue: 0
     }
-
-    return stats
   } catch (error) {
     console.error('Erreur lors de la récupération des statistiques:', error)
     throw error
@@ -258,25 +103,17 @@ export const getClientOrderStats = async (clientId) => {
 // Obtenir les statistiques des commandes pour un agriculteur
 export const getFarmerOrderStats = async (farmerId) => {
   try {
-    const { data, error } = await supabase
-      .from('orders')
-      .select('status, total_amount, created_at')
-      .eq('farmer_id', farmerId)
-
-    if (error) throw error
-
-    const stats = {
-      total: data.length,
-      pending: data.filter(o => o.status === 'pending').length,
-      processing: data.filter(o => o.status === 'processing').length,
-      shipped: data.filter(o => o.status === 'shipped').length,
-      delivered: data.filter(o => o.status === 'delivered').length,
-      cancelled: data.filter(o => o.status === 'cancelled').length,
-      totalRevenue: data.reduce((sum, o) => sum + (o.total_amount || 0), 0),
-      averageOrderValue: data.length > 0 ? data.reduce((sum, o) => sum + (o.total_amount || 0), 0) / data.length : 0
+    const res = await get(`/farmers/${farmerId}/orders/stats`)
+    return res?.stats || {
+      total: 0,
+      pending: 0,
+      processing: 0,
+      shipped: 0,
+      delivered: 0,
+      cancelled: 0,
+      totalRevenue: 0,
+      averageOrderValue: 0
     }
-
-    return stats
   } catch (error) {
     console.error('Erreur lors de la récupération des statistiques agriculteur:', error)
     throw error

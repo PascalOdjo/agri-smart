@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Droplets, Plus, Calendar, Clock, MapPin, Edit2, Trash2, TrendingUp, AlertTriangle } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function IrrigationTracker() {
@@ -51,21 +51,11 @@ export function IrrigationTracker() {
     }
 
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (farm) {
-        const { data, error } = await supabase
-          .from('irrigation_records')
-          .select('*')
-          .eq('farm_id', farm.id)
-          .order('irrigation_date', { ascending: false })
-
-        if (error) throw error
-        setRecords(data || [])
+        const res = await get(`/irrigation_records?farmId=${farm.id}`)
+        setRecords(res?.irrigation_records || res?.records || [])
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des enregistrements d\'irrigation:', error)
@@ -78,20 +68,11 @@ export function IrrigationTracker() {
     if (!user) return
 
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (farm) {
-        const { data, error } = await supabase
-          .from('water_reservoirs')
-          .select('*')
-          .eq('farm_id', farm.id)
-
-        if (error) throw error
-        setReservoirs(data || [])
+        const res = await get(`/water_reservoirs?farmId=${farm.id}`)
+        setReservoirs(res?.water_reservoirs || [])
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des réservoirs:', error)
@@ -106,34 +87,21 @@ export function IrrigationTracker() {
     }
 
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (!farm) throw new Error('Ferme non trouvée')
 
       const recordData = {
-        farm_id: farm.id,
+        farmId: farm.id,
         ...formData,
         water_volume_m3: parseFloat(formData.water_volume_m3),
         irrigation_duration_minutes: formData.irrigation_duration_minutes ? parseInt(formData.irrigation_duration_minutes) : null
       }
 
       if (editingRecord) {
-        const { error } = await supabase
-          .from('irrigation_records')
-          .update(recordData)
-          .eq('id', editingRecord.id)
-
-        if (error) throw error
+        await put(`/irrigation_records/${editingRecord.id}`, recordData)
       } else {
-        const { error } = await supabase
-          .from('irrigation_records')
-          .insert(recordData)
-
-        if (error) throw error
+        await post('/irrigation_records', recordData)
       }
 
       resetForm()
@@ -172,12 +140,7 @@ export function IrrigationTracker() {
   const handleDelete = async (id) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer cet enregistrement ?')) {
       try {
-        const { error } = await supabase
-          .from('irrigation_records')
-          .delete()
-          .eq('id', id)
-
-        if (error) throw error
+        await del(`/irrigation_records/${id}`)
         fetchIrrigationRecords()
       } catch (error) {
         console.error('Erreur lors de la suppression:', error)

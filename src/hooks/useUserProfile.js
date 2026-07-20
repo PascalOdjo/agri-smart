@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase.js'
 import { useAuth } from './useAuth.js'
+import { fetchCurrentUser } from '../services/apiAuth.js'
 
 export function useUserProfile() {
   const { user } = useAuth()
@@ -15,30 +15,32 @@ export function useUserProfile() {
     }
 
     const fetchProfile = async () => {
+      setLoading(true)
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('user_id', user.id)
-          .single()
-
-        if (error) {
-          console.error('Erreur profil:', error)
-          // Fallback vers les métadonnées utilisateur
+        const response = await fetchCurrentUser()
+        const fetchedUser = response?.user
+        if (fetchedUser) {
           setProfile({
-            role: user.user_metadata?.role || 'farmer',
-            full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
-            email: user.email
+            id: fetchedUser.id,
+            role: fetchedUser.role,
+            full_name: fetchedUser.fullName || fetchedUser.email?.split('@')[0],
+            email: fetchedUser.email,
+            region: fetchedUser.region || '',
+            created_at: fetchedUser.createdAt,
+            updated_at: fetchedUser.updatedAt
           })
         } else {
-          setProfile(data)
+          setProfile({
+            role: user.role || 'farmer',
+            full_name: user.fullName || user.email?.split('@')[0],
+            email: user.email
+          })
         }
       } catch (error) {
         console.error('Erreur profil:', error)
-        // Fallback vers les métadonnées utilisateur
         setProfile({
-          role: user.user_metadata?.role || 'farmer',
-          full_name: user.user_metadata?.full_name || user.email?.split('@')[0],
+          role: user.role || 'farmer',
+          full_name: user.fullName || user.email?.split('@')[0],
           email: user.email
         })
       } finally {

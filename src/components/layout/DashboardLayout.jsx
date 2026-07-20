@@ -41,7 +41,7 @@ export function DashboardLayout() {
   }
 
   // Utiliser les données du profil synchronisé pour le rôle
-  const userRole = profile?.role || user?.user_metadata?.role || 'farmer'
+  const userRole = profile?.role || user?.role || 'farmer'
 
   const allNavLinks = [
     { to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, roles: ['farmer', 'client'] },
@@ -124,7 +124,7 @@ export function DashboardLayout() {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-slate-900 truncate">
-                {profile?.full_name || user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'Utilisateur'}
+                {profile?.full_name || user?.fullName || user?.email?.split('@')[0] || 'Utilisateur'}
               </p>
               <p className="text-xs text-slate-500 truncate">{user?.email}</p>
               <p className="text-xs text-emerald-600 font-medium capitalize mt-0.5">

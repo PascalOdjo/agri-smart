@@ -391,7 +391,7 @@ export function Orders() {
                       <User className="w-4 h-4 text-slate-400 mt-0.5" />
                       <div>
                         <p className="font-medium text-slate-900">
-                          {selectedOrder.delivery_name || user?.user_metadata?.full_name || 'N/A'}
+                          {selectedOrder.delivery_name || user?.fullName || 'N/A'}
                         </p>
                         <p className="text-slate-600">
                           {selectedOrder.delivery_address || 'N/A'}

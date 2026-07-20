@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { MapPin, Plus, Edit2, Save, X, Trash2, Home, Droplets, Calendar, AlertTriangle, Sprout, Grid3x3 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function FarmManagement() {
@@ -59,17 +59,10 @@ export function FarmManagement() {
     if (!user) return
 
     try {
-      const { data, error } = await supabase
-        .from('farms')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setFarms(data || [])
-      if (data && data.length > 0) {
-        setSelectedFarm(data[0])
-      }
+      const res = await get(`/users/${user.id}/farms`)
+      const data = res?.farms || []
+      setFarms(data)
+      if (data.length > 0) setSelectedFarm(data[0])
     } catch (error) {
       console.error('Erreur lors de la récupération des fermes:', error)
     } finally {
@@ -79,14 +72,8 @@ export function FarmManagement() {
 
   const fetchParcels = async (farmId) => {
     try {
-      const { data, error } = await supabase
-        .from('parcels')
-        .select('*, crops(*)')
-        .eq('farm_id', farmId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setParcels(data || [])
+      const res = await get(`/farms/${farmId}/parcels`)
+      setParcels(res?.parcels || [])
     } catch (error) {
       console.error('Erreur lors de la récupération des parcelles:', error)
     }
@@ -94,14 +81,8 @@ export function FarmManagement() {
 
   const fetchCrops = async () => {
     try {
-      const { data, error } = await supabase
-        .from('crops')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setCrops(data || [])
+      const res = await get(`/users/${user.id}/crops`)
+      setCrops(res?.crops || [])
     } catch (error) {
       console.error('Erreur lors de la récupération des cultures:', error)
     }
@@ -118,18 +99,9 @@ export function FarmManagement() {
       }
 
       if (editingFarm) {
-        const { error } = await supabase
-          .from('farms')
-          .update(farmData)
-          .eq('id', editingFarm.id)
-
-        if (error) throw error
+        await put(`/farms/${editingFarm.id}`, farmData)
       } else {
-        const { error } = await supabase
-          .from('farms')
-          .insert(farmData)
-
-        if (error) throw error
+        await post('/farms', farmData)
       }
 
       resetFarmForm()
@@ -154,18 +126,9 @@ export function FarmManagement() {
       }
 
       if (editingParcel) {
-        const { error } = await supabase
-          .from('parcels')
-          .update(parcelData)
-          .eq('id', editingParcel.id)
-
-        if (error) throw error
+        await put(`/parcels/${editingParcel.id}`, parcelData)
       } else {
-        const { error } = await supabase
-          .from('parcels')
-          .insert(parcelData)
-
-        if (error) throw error
+        await post('/parcels', parcelData)
       }
 
       resetParcelForm()
@@ -181,12 +144,7 @@ export function FarmManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from('farms')
-        .delete()
-        .eq('id', farmId)
-
-      if (error) throw error
+      await del(`/farms/${farmId}`)
 
       if (selectedFarm?.id === farmId) {
         setSelectedFarm(null)
@@ -205,12 +163,7 @@ export function FarmManagement() {
     }
 
     try {
-      const { error } = await supabase
-        .from('parcels')
-        .delete()
-        .eq('id', parcelId)
-
-      if (error) throw error
+      await del(`/parcels/${parcelId}`)
       fetchParcels(selectedFarm.id)
     } catch (error) {
       console.error('Erreur lors de la suppression de la parcelle:', error)

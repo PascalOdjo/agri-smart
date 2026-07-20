@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MapPin, Target, Wrench, Cloud, Home, Plus, Edit2, Save, X, Droplets, Thermometer, Wind, Sun, AlertTriangle, AlertCircle, Info, BarChart3, Calendar, TrendingUp, Umbrella, Grid3x3, Sprout, Trash2 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 import { FarmMap } from '../components/FarmMap.jsx'
 
@@ -56,42 +56,37 @@ export function Farm() {
     if (!user) return
 
     setLoading(true)
-    const { data, error } = await supabase
-      .from('farms')
-      .select('*')
-      .eq('user_id', user.id)
-      .single()
-
-    if (data) {
-      setFarm(data)
-      setFarmName(data.farm_name || '')
-      setRegion(data.region || '')
-      setDepartment(data.department || '')
-      setCommune(data.commune || '')
-      setGpsCoordinates({
-        lat: data.gps_lat || '',
-        lng: data.gps_lng || ''
-      })
-      setFarmSize(data.farm_size || '')
-      setMainCrops(data.main_crops || '')
-      setProductionGoal(data.production_goal || '')
-      setEquipment(data.equipment || '')
-      setWeatherStation(data.weather_station || '')
-      setNotes(data.notes || '')
+    try {
+      const res = await get(`/farms?userId=${user.id}`)
+      const data = res?.farm || (res?.farms && res.farms[0])
+      if (data) {
+        setFarm(data)
+        setFarmName(data.farm_name || '')
+        setRegion(data.region || '')
+        setDepartment(data.department || '')
+        setCommune(data.commune || '')
+        setGpsCoordinates({
+          lat: data.gps_lat || '',
+          lng: data.gps_lng || ''
+        })
+        setFarmSize(data.farm_size || '')
+        setMainCrops(data.main_crops || '')
+        setProductionGoal(data.production_goal || '')
+        setEquipment(data.equipment || '')
+        setWeatherStation(data.weather_station || '')
+        setNotes(data.notes || '')
+      }
+    } catch (err) {
+      console.error('Erreur fetch farm:', err)
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
   }
 
   const fetchParcels = async (farmId) => {
     try {
-      const { data, error } = await supabase
-        .from('parcels')
-        .select('*')
-        .eq('farm_id', farmId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setParcels(data || [])
+      const res = await get(`/parcels?farmId=${farmId}`)
+      setParcels(res?.parcels || [])
     } catch (error) {
       console.error('Erreur lors de la récupération des parcelles:', error)
     }
@@ -112,18 +107,17 @@ export function Farm() {
       }
 
       if (editingParcel) {
-        const { error } = await supabase
-          .from('parcels')
-          .update(parcelData)
-          .eq('id', editingParcel.id)
-
-        if (error) throw error
+        try {
+          await put(`/parcels/${editingParcel.id}`, parcelData)
+        } catch (error) {
+          console.error('Erreur update parcel:', error)
+        }
       } else {
-        const { error } = await supabase
-          .from('parcels')
-          .insert(parcelData)
-
-        if (error) throw error
+        try {
+          await post('/parcels', parcelData)
+        } catch (error) {
+          console.error('Erreur insert parcel:', error)
+        }
       }
 
       resetParcelForm()
@@ -139,12 +133,7 @@ export function Farm() {
     }
 
     try {
-      const { error } = await supabase
-        .from('parcels')
-        .delete()
-        .eq('id', parcelId)
-
-      if (error) throw error
+      await del(`/parcels/${parcelId}`)
       fetchParcels(farm.id)
     } catch (error) {
       console.error('Erreur lors de la suppression de la parcelle:', error)
@@ -205,16 +194,12 @@ export function Farm() {
       notes
     }
 
-    const { error } = await supabase
-      .from('farms')
-      .upsert(farmData)
-      .select()
-
-    if (error) {
-      console.error('Erreur lors de la sauvegarde:', error)
-    } else {
+    try {
+      await post('/farms/upsert', farmData)
       setFarm(farmData)
       setEditing(false)
+    } catch (err) {
+      console.error('Erreur lors de la sauvegarde:', err)
     }
 
     setSaving(false)
@@ -286,7 +271,7 @@ export function Farm() {
               <p className="text-sm text-slate-600">Informations géographiques</p>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <div>
               <span className="text-sm text-slate-600">Région:</span>
@@ -327,7 +312,7 @@ export function Farm() {
               <p className="text-sm text-slate-600">Objectifs et cultures</p>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <div>
               <span className="text-sm text-slate-600">Superficie:</span>
@@ -360,7 +345,7 @@ export function Farm() {
               <p className="text-sm text-slate-600">Matériel et installations</p>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <div>
               <span className="text-sm text-slate-600">Équipements:</span>
@@ -387,7 +372,7 @@ export function Farm() {
               <p className="text-sm text-slate-600">Vue d'ensemble</p>
             </div>
           </div>
-          
+
           <div className="space-y-3">
             <div>
               <span className="text-sm text-slate-600">Nombre de parcelles:</span>
@@ -498,7 +483,7 @@ export function Farm() {
                   type="number"
                   step="any"
                   value={gpsCoordinates.lat}
-                  onChange={(e) => setGpsCoordinates({...gpsCoordinates, lat: e.target.value})}
+                  onChange={(e) => setGpsCoordinates({ ...gpsCoordinates, lat: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Latitude"
                 />
@@ -512,7 +497,7 @@ export function Farm() {
                   type="number"
                   step="any"
                   value={gpsCoordinates.lng}
-                  onChange={(e) => setGpsCoordinates({...gpsCoordinates, lng: e.target.value})}
+                  onChange={(e) => setGpsCoordinates({ ...gpsCoordinates, lng: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   placeholder="Longitude"
                 />
@@ -661,31 +646,30 @@ export function Farm() {
                       Type de sol: {parcel.soil_type || 'Non spécifié'}
                     </span>
                   </div>
-                  
+
                   {parcel.irrigation_type && (
                     <div className="flex items-center gap-2">
                       <Droplets className="w-4 h-4 text-blue-600" />
                       <span className="text-slate-600">{parcel.irrigation_type}</span>
                     </div>
                   )}
-                  
-                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-                    parcel.status === 'active' ? 'bg-green-100 text-green-700' :
-                    parcel.status === 'preparing' ? 'bg-yellow-100 text-yellow-700' :
-                    parcel.status === 'harvested' ? 'bg-blue-100 text-blue-700' :
-                    'bg-gray-100 text-gray-700'
-                  }`}>
+
+                  <div className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs ${parcel.status === 'active' ? 'bg-green-100 text-green-700' :
+                      parcel.status === 'preparing' ? 'bg-yellow-100 text-yellow-700' :
+                        parcel.status === 'harvested' ? 'bg-blue-100 text-blue-700' :
+                          'bg-gray-100 text-gray-700'
+                    }`}>
                     {parcel.status === 'active' ? 'Active' :
-                     parcel.status === 'preparing' ? 'Préparation' :
-                     parcel.status === 'harvested' ? 'Récoltée' : 'Inactive'}
+                      parcel.status === 'preparing' ? 'Préparation' :
+                        parcel.status === 'harvested' ? 'Récoltée' : 'Inactive'}
                   </div>
-                  
+
                   {parcel.planting_date && (
                     <p className="text-slate-600">
                       Plantation: {new Date(parcel.planting_date).toLocaleDateString('fr-FR')}
                     </p>
                   )}
-                  
+
                   {parcel.expected_harvest_date && (
                     <p className="text-slate-600">
                       Récolte prévue: {new Date(parcel.expected_harvest_date).toLocaleDateString('fr-FR')}
@@ -705,74 +689,74 @@ export function Farm() {
             <h3 className="text-lg font-semibold text-slate-800 mb-4">
               {editingParcel ? 'Modifier la parcelle' : 'Nouvelle parcelle'}
             </h3>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nom de la parcelle</label>
                 <input
                   type="text"
                   value={parcelForm.name}
-                  onChange={(e) => setParcelForm({...parcelForm, name: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, name: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                   required
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Superficie (ha)</label>
                 <input
                   type="number"
                   value={parcelForm.surface_area}
-                  onChange={(e) => setParcelForm({...parcelForm, surface_area: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, surface_area: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type de sol</label>
                 <input
                   type="text"
                   value={parcelForm.soil_type}
-                  onChange={(e) => setParcelForm({...parcelForm, soil_type: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, soil_type: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Type d'irrigation</label>
                 <input
                   type="text"
                   value={parcelForm.irrigation_type}
-                  onChange={(e) => setParcelForm({...parcelForm, irrigation_type: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, irrigation_type: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Date de plantation</label>
                 <input
                   type="date"
                   value={parcelForm.planting_date}
-                  onChange={(e) => setParcelForm({...parcelForm, planting_date: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, planting_date: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Date de récolte prévue</label>
                 <input
                   type="date"
                   value={parcelForm.expected_harvest_date}
-                  onChange={(e) => setParcelForm({...parcelForm, expected_harvest_date: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, expected_harvest_date: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Statut</label>
                 <select
                   value={parcelForm.status}
-                  onChange={(e) => setParcelForm({...parcelForm, status: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, status: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 >
                   <option value="active">Active</option>
@@ -781,40 +765,40 @@ export function Farm() {
                   <option value="harvested">Récoltée</option>
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Latitude GPS</label>
                 <input
                   type="number"
                   step="any"
                   value={parcelForm.gps_lat}
-                  onChange={(e) => setParcelForm({...parcelForm, gps_lat: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, gps_lat: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Longitude GPS</label>
                 <input
                   type="number"
                   step="any"
                   value={parcelForm.gps_lng}
-                  onChange={(e) => setParcelForm({...parcelForm, gps_lng: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, gps_lng: e.target.value })}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
-              
+
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
                 <textarea
                   value={parcelForm.notes}
-                  onChange={(e) => setParcelForm({...parcelForm, notes: e.target.value})}
+                  onChange={(e) => setParcelForm({ ...parcelForm, notes: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSaveParcel}
@@ -840,7 +824,7 @@ export function Farm() {
             <MapPin className="w-5 h-5 text-emerald-600" />
             Carte de la ferme
           </h2>
-          <FarmMap 
+          <FarmMap
             farmName={farm.farm_name}
             lat={farm.gps_lat}
             lng={farm.gps_lng}

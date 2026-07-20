@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { Leaf, Mail, Lock } from 'lucide-react'
-import { signIn, resendConfirmationEmail } from '../services/auth.js'
-import { supabase } from '../lib/supabase.js'
+import { Leaf, Mail, Lock, AlertCircle } from 'lucide-react'
+import { signIn, resendConfirmationEmail, requestPasswordReset, getCurrentUser } from '../services/auth.js'
+import { getSupabaseConfigStatus } from '../utils/appConfig.js'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -11,9 +11,11 @@ export function Login() {
   const [success, setSuccess] = useState('')
   const [loading, setLoading] = useState(false)
   const [resendLoading, setResendLoading] = useState(false)
+  const [forgotLoading, setForgotLoading] = useState(false)
   const navigate = useNavigate()
   const location = useLocation()
   const from = location.state?.from?.pathname || '/dashboard'
+  const supabaseStatus = getSupabaseConfigStatus()
 
   const isEmailNotConfirmed = error && (
     /confirm|vérifiez|verified|confirmation/i.test(error) ||
@@ -26,12 +28,10 @@ export function Login() {
     setSuccess('')
     setLoading(true)
     try {
-      await signIn(email, password)
+      const res = await signIn(email, password)
+      const user = res?.user || (await getCurrentUser())?.user
 
-      // Récupérer l'utilisateur connecté pour vérifier son rôle
-      const { data: { user } } = await supabase.auth.getUser()
-
-      if (user?.user_metadata?.role === 'admin') {
+      if (user?.role === 'admin') {
         navigate('/super-admin', { replace: true })
       } else {
         navigate(from, { replace: true })
@@ -61,6 +61,31 @@ export function Login() {
     }
   }
 
+  async function handleForgotPassword() {
+    if (!supabaseStatus.configured) {
+      setError('Impossible d\'envoyer le lien de réinitialisation : l\'API n\'est pas configurée.')
+      return
+    }
+
+    if (!email) {
+      setError('Saisissez votre adresse email pour recevoir le lien de réinitialisation.')
+      return
+    }
+
+    setError('')
+    setSuccess('')
+    setForgotLoading(true)
+
+    try {
+      await requestPasswordReset(email)
+      setSuccess('Si un compte existe pour cette adresse, un email de réinitialisation a été envoyé.')
+    } catch (err) {
+      setError(err.message || 'Impossible d\'envoyer l\'email de réinitialisation.')
+    } finally {
+      setForgotLoading(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-emerald-50 flex flex-col">
       <div className="bg-gradient-to-br from-emerald-700 to-emerald-900 text-white py-8 px-4 text-center">
@@ -73,6 +98,12 @@ export function Login() {
       <div className="flex-1 flex flex-col items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <h1 className="text-2xl font-bold text-emerald-900 text-center mb-6">Connexion</h1>
+          {!supabaseStatus.configured && (
+            <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>{supabaseStatus.message}</span>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="text-red-600 text-sm bg-red-50 p-3 rounded-lg space-y-2" role="alert">
@@ -107,7 +138,7 @@ export function Login() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   required
-                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-emerald-200 bg-white text-emerald-900 placeholder-emerald-400 focus:ring-2 focus:ring-emerald-500 focus:border-emeerald-500 transition-all outline-none "
+                  className="w-full pl-10 pr-4 py-3 rounded-xl border border-emerald-200 bg-white text-emerald-900 placeholder-emerald-400 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-all outline-none "
                   placeholder="votre@email.com"
                 />
               </div>
@@ -130,6 +161,14 @@ export function Login() {
                 />
               </div>
             </div>
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={!supabaseStatus.configured || forgotLoading || loading}
+              className="w-full text-sm font-medium text-emerald-700 hover:underline disabled:opacity-50"
+            >
+              {forgotLoading ? 'Envoi...' : 'Mot de passe oublié ?'}
+            </button>
             <button
               type="submit"
               disabled={loading}

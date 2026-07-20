@@ -13,7 +13,7 @@ import {
   Search,
   Filter
 } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function AdminPriceManagement() {
@@ -26,7 +26,7 @@ export function AdminPriceManagement() {
   const [showAddForm, setShowAddForm] = useState(false)
 
   // Vérifier si l'utilisateur est admin
-  const isAdmin = user?.user_metadata?.role === 'admin'
+  const isAdmin = user?.role === 'admin'
 
   useEffect(() => {
     if (!isAdmin) return
@@ -36,15 +36,9 @@ export function AdminPriceManagement() {
 
   const fetchProducts = async () => {
     try {
-      // Essayer de récupérer les prix nationaux d'abord
-      const { data: nationalPrices, error: nationalError } = await supabase
-        .from('national_prices')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false })
-
-      if (!nationalError && nationalPrices && nationalPrices.length > 0) {
-        // Transformer les prix nationaux en format de produits
+      const res = await get('/national_prices?status=active')
+      const nationalPrices = res?.national_prices || []
+      if (nationalPrices.length > 0) {
         const formattedProducts = nationalPrices.map(price => ({
           id: price.id,
           title: price.product_name,
@@ -52,8 +46,8 @@ export function AdminPriceManagement() {
           category: price.product_category,
           price: price.reference_price,
           unit: price.unit,
-          stock: 999999, // Stock illimité pour les prix nationaux
-          farmer_id: null, // Prix national, pas de farmer spécifique
+          stock: 999999,
+          farmer_id: null,
           created_at: price.created_at,
           image: null,
           is_national_price: true
@@ -62,23 +56,8 @@ export function AdminPriceManagement() {
         return
       }
 
-      // Si pas de prix nationaux, essayer la table products
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        // Si la table n'existe pas, créer des produits de test étendus
-        if (error.code === 'PGRST116' || error.message.includes('does not exist')) {
-          console.log('Table products non trouvée, utilisation des données de test étendues')
-          setProducts(getTestProducts())
-          return
-        }
-        throw error
-      }
-
-      setProducts(data || [])
+      const productsRes = await get('/products')
+      setProducts(productsRes?.products || [])
     } catch (error) {
       console.error('Erreur lors de la récupération des produits:', error)
       setProducts(getTestProducts())
@@ -207,34 +186,25 @@ export function AdminPriceManagement() {
     try {
       if (editingProduct) {
         // Mise à jour
-        const { error } = await supabase
-          .from('products')
-          .update({
-            title: productData.title,
-            description: productData.description,
-            category: productData.category,
-            price: productData.price,
-            unit: productData.unit,
-            stock: productData.stock
-          })
-          .eq('id', editingProduct.id)
-
-        if (error) throw error
+        await put(`/products/${editingProduct.id}`, {
+          title: productData.title,
+          description: productData.description,
+          category: productData.category,
+          price: productData.price,
+          unit: productData.unit,
+          stock: productData.stock
+        })
       } else {
         // Création
-        const { error } = await supabase
-          .from('products')
-          .insert({
-            title: productData.title,
-            description: productData.description,
-            category: productData.category,
-            price: productData.price,
-            unit: productData.unit,
-            stock: productData.stock,
-            farmer_id: 'farmer-1' // ID par défaut
-          })
-
-        if (error) throw error
+        await post('/products', {
+          title: productData.title,
+          description: productData.description,
+          category: productData.category,
+          price: productData.price,
+          unit: productData.unit,
+          stock: productData.stock,
+          farmer_id: 'farmer-1'
+        })
       }
 
       await fetchProducts()
@@ -249,13 +219,7 @@ export function AdminPriceManagement() {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return
 
     try {
-      const { error } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId)
-
-      if (error) throw error
-
+      await del(`/products/${productId}`)
       await fetchProducts()
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)

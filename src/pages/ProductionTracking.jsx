@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Calendar, Plus, CheckCircle, Clock, Droplets, Sprout, Scissors, Package, AlertCircle, Filter, Search } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth.js'
-import { supabase } from '../lib/supabase.js'
+import { get, post } from '../lib/api.js'
 
 export function ProductionTracking() {
   const { user } = useAuth()
@@ -62,14 +62,8 @@ export function ProductionTracking() {
 
   const loadJournalEntries = async () => {
     try {
-      const { data, error } = await supabase
-        .from('production_journal')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-
-      if (error) throw error
-      setJournalEntries(data || [])
+      const res = await get(`/users/${user.id}/production_journal`)
+      setJournalEntries(res?.entries || [])
     } catch (error) {
       console.error('Erreur chargement journal:', error)
     }
@@ -77,15 +71,11 @@ export function ProductionTracking() {
 
   const saveJournalEntry = async () => {
     try {
-      const { error } = await supabase
-        .from('production_journal')
-        .insert({
-          user_id: user.id,
-          ...newEntry,
-          created_at: new Date().toISOString()
-        })
-
-      if (error) throw error
+      await post('/production_journal', {
+        user_id: user.id,
+        ...newEntry,
+        created_at: new Date().toISOString()
+      })
 
       setNewEntry({
         date: new Date().toISOString().split('T')[0],
@@ -113,7 +103,7 @@ export function ProductionTracking() {
       })
       return allPhases
     }
-    
+
     const crop = cropCalendar[selectedCrop]
     return crop ? crop.phases.filter(phase => phase.month === selectedMonth) : []
   }
@@ -150,11 +140,10 @@ export function ProductionTracking() {
       <div className="flex bg-white rounded-xl shadow-sm border border-slate-200 p-1">
         <button
           onClick={() => setActiveTab('calendar')}
-          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-            activeTab === 'calendar'
+          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${activeTab === 'calendar'
               ? 'bg-emerald-600 text-white'
               : 'text-slate-600 hover:text-slate-900'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-center gap-2">
             <Calendar className="w-5 h-5" />
@@ -163,11 +152,10 @@ export function ProductionTracking() {
         </button>
         <button
           onClick={() => setActiveTab('journal')}
-          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${
-            activeTab === 'journal'
+          className={`flex-1 py-3 px-4 rounded-lg font-medium transition-all ${activeTab === 'journal'
               ? 'bg-emerald-600 text-white'
               : 'text-slate-600 hover:text-slate-900'
-          }`}
+            }`}
         >
           <div className="flex items-center justify-center gap-2">
             <Clock className="w-5 h-5" />
@@ -213,7 +201,7 @@ export function ProductionTracking() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {Object.entries(cropCalendar).map(([cropKey, crop]) => {
               if (selectedCrop !== 'all' && selectedCrop !== cropKey) return null
-              
+
               const Icon = crop.icon
               return (
                 <div key={cropKey} className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -226,28 +214,25 @@ export function ProductionTracking() {
                       <p className="text-slate-600">Cycle annuel</p>
                     </div>
                   </div>
-                  
+
                   <div className="space-y-3">
                     {crop.phases.map((phase, index) => {
                       const PhaseIcon = phase.icon
                       const isCurrentMonth = phase.month === selectedMonth
-                      
+
                       return (
                         <div
                           key={index}
-                          className={`p-3 rounded-lg border transition-all ${
-                            isCurrentMonth
+                          className={`p-3 rounded-lg border transition-all ${isCurrentMonth
                               ? 'border-emerald-500 bg-emerald-50'
                               : 'border-slate-200 bg-slate-50'
-                          }`}
+                            }`}
                         >
                           <div className="flex items-start gap-3">
-                            <div className={`p-2 rounded-lg ${
-                              isCurrentMonth ? 'bg-emerald-100' : 'bg-slate-100'
-                            }`}>
-                              <PhaseIcon className={`w-4 h-4 ${
-                                isCurrentMonth ? 'text-emerald-600' : 'text-slate-600'
-                              }`} />
+                            <div className={`p-2 rounded-lg ${isCurrentMonth ? 'bg-emerald-100' : 'bg-slate-100'
+                              }`}>
+                              <PhaseIcon className={`w-4 h-4 ${isCurrentMonth ? 'text-emerald-600' : 'text-slate-600'
+                                }`} />
                             </div>
                             <div className="flex-1">
                               <div className="flex items-center gap-2 mb-1">
@@ -370,7 +355,7 @@ export function ProductionTracking() {
           {/* Liste des entrées */}
           <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
             <h3 className="text-lg font-semibold text-slate-900 mb-4">Historique des interventions</h3>
-            
+
             {journalEntries.length === 0 ? (
               <div className="text-center py-8 text-slate-500">
                 <Clock className="w-12 h-12 mx-auto mb-3 text-slate-400" />
@@ -382,7 +367,7 @@ export function ProductionTracking() {
                 {journalEntries.map((entry, index) => {
                   const EntryIcon = getEntryIcon(entry.type)
                   const entryColor = getEntryColor(entry.type)
-                  
+
                   return (
                     <div key={index} className="p-4 border border-slate-200 rounded-lg hover:bg-slate-50">
                       <div className="flex items-start gap-3">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { BookOpen, Video, FileText, ExternalLink } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get } from '../lib/api.js'
 
 export function Formations() {
   const [formations, setFormations] = useState([])
@@ -8,14 +8,9 @@ export function Formations() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    supabase
-      .from('formations')
-      .select('*')
-      .order('order_index')
-      .then(({ data, error: e }) => {
-        if (e) setError(e.message)
-        else setFormations(data || [])
-      })
+    get('/formations')
+      .then((res) => setFormations(res?.formations || []))
+      .catch((e) => setError(e.message || 'Erreur chargement formations'))
       .finally(() => setLoading(false))
   }, [])
 

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Beaker, Plus, Search, Filter, Calendar, MapPin, Droplets, Leaf, AlertTriangle, Edit2, Trash2, TrendingUp, BarChart3, Star } from 'lucide-react'
-import { supabase } from '../lib/supabase.js'
+import { get, post, put, del } from '../lib/api.js'
 import { useAuth } from '../hooks/useAuth.js'
 
 export function TreatmentTracking() {
@@ -48,51 +48,21 @@ export function TreatmentTracking() {
 
   const fetchData = async () => {
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
 
       if (farm) {
-        const [
-          treatmentsResult,
-          interventionsResult,
-          fertilizersResult,
-          phytoResult
-        ] = await Promise.all([
-          supabase
-            .from('treatment_applications')
-            .select('*, cultural_interventions(intervention_type, title, target_parcel)')
-            .eq('farm_id', farm.id)
-            .order('treatment_date', { ascending: false }),
-
-          supabase
-            .from('cultural_interventions')
-            .select('id, title, intervention_type, target_parcel')
-            .eq('farm_id', farm.id)
-            .eq('status', 'completed'),
-
-          supabase
-            .from('fertilizers')
-            .select('id, product_name, product_type, npk_ratio')
-            .eq('farm_id', farm.id),
-
-          supabase
-            .from('phyto_products')
-            .select('id, product_name, product_type, active_ingredient')
-            .eq('farm_id', farm.id)
+        const [treatmentsRes, interventionsRes, fertilizersRes, phytoRes] = await Promise.all([
+          get(`/treatment_applications?farmId=${farm.id}`),
+          get(`/cultural_interventions?farmId=${farm.id}&status=completed`),
+          get(`/fertilizers?farmId=${farm.id}`),
+          get(`/phyto_products?farmId=${farm.id}`)
         ])
 
-        if (treatmentsResult.error) throw treatmentsResult.error
-        if (interventionsResult.error) throw interventionsResult.error
-        if (fertilizersResult.error) throw fertilizersResult.error
-        if (phytoResult.error) throw phytoResult.error
-
-        setTreatments(treatmentsResult.data || [])
-        setInterventions(interventionsResult.data || [])
-        setFertilizers(fertilizersResult.data || [])
-        setPhytoProducts(phytoResult.data || [])
+        setTreatments(treatmentsRes?.treatment_applications || treatmentsRes?.treatments || [])
+        setInterventions(interventionsRes?.cultural_interventions || interventionsRes?.interventions || [])
+        setFertilizers(fertilizersRes?.fertilizers || [])
+        setPhytoProducts(phytoRes?.phyto_products || [])
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des données:', error)
@@ -104,12 +74,8 @@ export function TreatmentTracking() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     try {
-      const { data: farm } = await supabase
-        .from('farms')
-        .select('id')
-        .eq('user_id', user.id)
-        .single()
-
+      const farmRes = await get(`/farms?userId=${user.id}`)
+      const farm = farmRes?.farm || (farmRes?.farms && farmRes.farms[0])
       if (!farm) throw new Error('Ferme non trouvée')
 
       const treatmentData = {
@@ -122,18 +88,9 @@ export function TreatmentTracking() {
       }
 
       if (editingTreatment) {
-        const { error } = await supabase
-          .from('treatment_applications')
-          .update(treatmentData)
-          .eq('id', editingTreatment.id)
-
-        if (error) throw error
+        await put(`/treatment_applications/${editingTreatment.id}`, treatmentData)
       } else {
-        const { error } = await supabase
-          .from('treatment_applications')
-          .insert(treatmentData)
-
-        if (error) throw error
+        await post('/treatment_applications', treatmentData)
       }
 
       resetForm()
@@ -190,12 +147,7 @@ export function TreatmentTracking() {
   const handleDelete = async (id) => {
     if (confirm('Êtes-vous sûr de vouloir supprimer ce traitement ?')) {
       try {
-        const { error } = await supabase
-          .from('treatment_applications')
-          .delete()
-          .eq('id', id)
-
-        if (error) throw error
+        await del(`/treatment_applications/${id}`)
         fetchData()
       } catch (error) {
         console.error('Erreur lors de la suppression:', error)

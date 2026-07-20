@@ -1,46 +1,32 @@
 const apiKey = import.meta.env.VITE_OPENAI_API_KEY
 
-export async function getDiagnosis(imageUrl) {
-  if (!apiKey) return getDiagnosisMock()
-  const res = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
-    body: JSON.stringify({
-      model: 'gpt-4o',
-      max_tokens: 1500,
-      messages: [{
-        role: 'system',
-        content: `Tu es un expert agricole spécialisé dans les maladies des cultures au Togo et en Afrique de l'Ouest. 
-        Analyse les images de plantes et fournis un diagnostic précis avec des solutions pratiques adaptées au contexte local.
-        Sois spécifique sur les symptômes observés et donne des traitements accessibles aux petits agriculteurs.
-        
-        Réponds UNIQUEMENT en JSON avec ce format exact:
-        {
-          "disease_name": "nom précis de la maladie",
-          "symptoms": "symptômes observés sur la plante",
-          "cause": "cause probable (fongique, bactérienne, virale, carence, etc)",
-          "severity": "faible|moderee|elevee",
-          "treatment": "traitement chimique avec produits et dosages spécifiques",
-          "eco_treatment": "traitement biologique/ecologique avec recettes locales",
-          "prevention": "mesures préventives pour éviter la récidive",
-          "cultural_practices": "pratiques culturales recommandées"
-        }`
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text: 'Analyse cette plante agricole et donne un diagnostic complet. Identifie la maladie, les symptômes visibles, la cause, et propose des solutions de traitement adaptées aux conditions locales au Togo. Inclut des traitements chimiques et écologiques accessibles.'
-          },
-          { type: 'image_url', image_url: { url: imageUrl } }
-        ]
-      }]
-    })
+function isLocalImageUrl(url) {
+  if (!url) return true
+  return /^https?:\/\/(localhost|127\.0\.0\.1)/i.test(url)
+}
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('Impossible de lire l\'image'))
+    reader.readAsDataURL(file)
   })
-  if (!res.ok) throw new Error('API error')
-  const data = await res.json()
-  const text = data.choices?.[0]?.message?.content || '{}'
+}
+
+async function resolveImageForVision(imageUrl, file) {
+  if (file) {
+    return fileToDataUrl(file)
+  }
+
+  if (imageUrl && !isLocalImageUrl(imageUrl)) {
+    return imageUrl
+  }
+
+  throw new Error('Image locale introuvable pour l\'analyse')
+}
+
+function parseDiagnosisResponse(text) {
   const m = text.match(/\{[\s\S]*\}/)
   const p = JSON.parse(m ? m[0] : '{}')
   return {
@@ -52,6 +38,67 @@ export async function getDiagnosis(imageUrl) {
     eco_treatment: p.eco_treatment || 'Appliquer des traitements biologiques locaux.',
     prevention: p.prevention || 'Maintenir de bonnes pratiques culturales.',
     cultural_practices: p.cultural_practices || 'Surveiller régulièrement les cultures.'
+  }
+}
+
+const SYSTEM_PROMPT = `Tu es un expert agricole spécialisé dans les maladies des cultures au Togo et en Afrique de l'Ouest. 
+Analyse les images de plantes et fournis un diagnostic précis avec des solutions pratiques adaptées au contexte local.
+Sois spécifique sur les symptômes observés et donne des traitements accessibles aux petits agriculteurs.
+
+Réponds UNIQUEMENT en JSON avec ce format exact:
+{
+  "disease_name": "nom précis de la maladie",
+  "symptoms": "symptômes observés sur la plante",
+  "cause": "cause probable (fongique, bactérienne, virale, carence, etc)",
+  "severity": "faible|moderee|elevee",
+  "treatment": "traitement chimique avec produits et dosages spécifiques",
+  "eco_treatment": "traitement biologique/ecologique avec recettes locales",
+  "prevention": "mesures préventives pour éviter la récidive",
+  "cultural_practices": "pratiques culturales recommandées"
+}`
+
+export async function getDiagnosis(imageUrl, file = null) {
+  if (!apiKey) return getDiagnosisMock()
+
+  try {
+    const visionUrl = await resolveImageForVision(imageUrl, file)
+
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + apiKey },
+      body: JSON.stringify({
+        model: 'gpt-4o',
+        max_tokens: 1500,
+        messages: [{
+          role: 'system',
+          content: SYSTEM_PROMPT
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text: 'Analyse cette plante agricole et donne un diagnostic complet. Identifie la maladie, les symptômes visibles, la cause, et propose des solutions de traitement adaptées aux conditions locales au Togo. Inclut des traitements chimiques et écologiques accessibles.'
+            },
+            { type: 'image_url', image_url: { url: visionUrl } }
+          ]
+        }]
+      })
+    })
+
+    if (!res.ok) {
+      const errData = await res.json().catch(() => ({}))
+      const detail = errData?.error?.message || `HTTP ${res.status}`
+      console.warn('OpenAI API non disponible, utilisation du mode démo:', detail)
+      return getDiagnosisMock()
+    }
+
+    const data = await res.json()
+    const text = data.choices?.[0]?.message?.content || '{}'
+    return parseDiagnosisResponse(text)
+  } catch (error) {
+    console.warn('Erreur API OpenAI, utilisation du mode démo:', error.message)
+    return getDiagnosisMock()
   }
 }
 
@@ -97,20 +144,7 @@ export async function getTextDiagnosis(description) {
 
     const data = await res.json()
     const text = data.choices?.[0]?.message?.content || '{}'
-    const m = text.match(/\{[\s\S]*\}/)
-    const p = JSON.parse(m ? m[0] : '{}')
-
-    return {
-      disease_name: p.disease_name || 'Maladie non identifiée',
-      symptoms: p.symptoms || 'Symptômes non spécifiés',
-      cause: p.cause || 'Cause inconnue',
-      severity: p.severity || 'moderee',
-      treatment: p.treatment || 'Consulter un agent agricole pour diagnostic approfondi.',
-      eco_treatment: p.eco_treatment || 'Appliquer des traitements biologiques locaux.',
-      prevention: p.prevention || 'Maintenir de bonnes pratiques culturales.',
-      cultural_practices: p.cultural_practices || 'Surveiller régulièrement les cultures.'
-    }
-
+    return parseDiagnosisResponse(text)
   } catch (error) {
     console.warn('Erreur API OpenAI, utilisation du mode démo:', error.message)
     return getTextDiagnosisMock(description)
@@ -118,7 +152,6 @@ export async function getTextDiagnosis(description) {
 }
 
 function getTextDiagnosisMock(description) {
-  // Analyser la description pour choisir le diagnostic approprié
   const desc = description.toLowerCase()
 
   if (desc.includes('manioc') || desc.includes('cassava')) {
@@ -173,7 +206,6 @@ function getTextDiagnosisMock(description) {
     }
   }
 
-  // Diagnostic par défaut
   return Promise.resolve({
     disease_name: 'Symptôme général de stress végétatif',
     symptoms: 'Symptômes variés pouvant indiquer plusieurs problèmes : carences nutritives, stress hydrique ou maladies.',
@@ -187,7 +219,6 @@ function getTextDiagnosisMock(description) {
 }
 
 function getDiagnosisMock() {
-  // Simuler différents diagnostics selon le contexte
   const mockDiagnoses = [
     {
       disease_name: 'Mildiou du manioc',
@@ -231,7 +262,6 @@ function getDiagnosisMock() {
     }
   ]
 
-  // Retourner un diagnostic aléatoire pour simuler l'IA
   const randomDiagnosis = mockDiagnoses[Math.floor(Math.random() * mockDiagnoses.length)]
   return Promise.resolve(randomDiagnosis)
 }
