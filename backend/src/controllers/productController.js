@@ -78,7 +78,7 @@ export const updateProduct = handleAsync(async (req, res) => {
         throw new AppError('Product not found', 404)
     }
 
-    if (product.farmerId !== req.user.id) {
+    if (product.farmerId !== req.user.id && req.user.role !== 'admin') {
         throw new AppError('Unauthorized to update this product', 403)
     }
 
@@ -105,7 +105,7 @@ export const deleteProduct = handleAsync(async (req, res) => {
         throw new AppError('Product not found', 404)
     }
 
-    if (product.farmerId !== req.user.id) {
+    if (product.farmerId !== req.user.id && req.user.role !== 'admin') {
         throw new AppError('Unauthorized to delete this product', 403)
     }
 

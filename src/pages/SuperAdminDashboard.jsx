@@ -114,6 +114,7 @@ export function SuperAdminDashboard() {
           category: price.product_category,
           price: price.reference_price,
           unit: price.unit,
+          region: price.region,
           stock: 999999,
           farmer_id: null,
           created_at: price.created_at,
@@ -612,6 +613,7 @@ function UsersTab({ users }) {
 function ProductsTab({ products, regions }) {
   const [editingProduct, setEditingProduct] = useState(null)
   const [showAddForm, setShowAddForm] = useState(false)
+  const [savingProduct, setSavingProduct] = useState(false)
 
   const handleEditProduct = (product) => {
     setEditingProduct(product)
@@ -624,7 +626,9 @@ function ProductsTab({ products, regions }) {
     }
 
     try {
-      await del(`/national_prices/${productId}`)
+      const product = products.find((item) => item.id === productId)
+      await del(`${product?.is_national_price ? '/national_prices' : '/products'}/${productId}`)
+      setShowAddForm(false)
       window.location.reload()
     } catch (error) {
       console.error('Erreur lors de la suppression:', error)
@@ -690,7 +694,7 @@ function ProductsTab({ products, regions }) {
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-slate-700">{product.region}</span>
+                    <span className="text-slate-700">{product.region || 'Toutes les régions'}</span>
                   </td>
                   <td className="px-6 py-4">
                     <span className={`font-medium ${product.stock > 100 ? 'text-green-600' :
@@ -742,18 +746,26 @@ function ProductsTab({ products, regions }) {
             <form onSubmit={async (e) => {
               e.preventDefault()
               const formData = new FormData(e.target)
-              const productData = {
-                product_name: formData.get('product_name'),
-                product_category: formData.get('product_category'),
-                reference_price: parseFloat(formData.get('reference_price')),
-                unit: formData.get('unit'),
-                effective_date: new Date().toISOString().split('T')[0]
-              }
+              const productData = editingProduct?.is_national_price
+                ? {
+                  product_name: formData.get('product_name'),
+                  product_category: formData.get('product_category'),
+                  reference_price: parseFloat(formData.get('reference_price')),
+                  unit: formData.get('unit'),
+                  region: formData.get('region'),
+                  effective_date: new Date().toISOString().split('T')[0]
+                }
+                : {
+                  title: formData.get('product_name'),
+                  price: parseFloat(formData.get('reference_price')),
+                  unit: formData.get('unit')
+                }
 
               try {
+                setSavingProduct(true)
                 if (editingProduct) {
                   // Modifier le produit
-                  await put(`/national_prices/${editingProduct.id}`, productData)
+                  await put(`${editingProduct.is_national_price ? '/national_prices' : '/products'}/${editingProduct.id}`, productData)
                   alert('Produit modifié avec succès')
                   setShowAddForm(false)
                   window.location.reload()
@@ -766,7 +778,9 @@ function ProductsTab({ products, regions }) {
                 }
               } catch (error) {
                 console.error('Erreur:', error)
-                alert('Erreur lors de l\'opération')
+                alert(`Erreur lors de l'opération : ${error.message}`)
+              } finally {
+                setSavingProduct(false)
               }
             }} className="space-y-4">
               <div>
@@ -820,6 +834,25 @@ function ProductsTab({ products, regions }) {
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Région
+                </label>
+                <select
+                  name="region"
+                  defaultValue={editingProduct?.region || ''}
+                  className="w-full px-3 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">Toutes les régions</option>
+                  {(regions.length > 0
+                    ? regions.map((region) => region.name)
+                    : ['Maritime', 'Plateaux', 'Centrale', 'Kara', 'Savanes']
+                  ).map((region) => (
+                    <option key={region} value={region}>{region}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
                   Unité
                 </label>
                 <select
@@ -846,9 +879,10 @@ function ProductsTab({ products, regions }) {
                 </button>
                 <button
                   type="submit"
+                  disabled={savingProduct}
                   className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg font-medium hover:bg-purple-700 transition-colors"
                 >
-                  {editingProduct ? 'Modifier' : 'Ajouter'}
+                  {savingProduct ? 'Enregistrement...' : editingProduct ? 'Modifier' : 'Ajouter'}
                 </button>
               </div>
             </form>

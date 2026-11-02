@@ -1,5 +1,5 @@
 import { Outlet, Link, useLocation } from 'react-router-dom'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   LayoutDashboard,
   Camera,
@@ -23,12 +23,46 @@ import {
 import { useAuth } from '../../hooks/useAuth.js'
 import { useUserProfile } from '../../hooks/useUserProfile.js'
 import { signOut } from '../../services/auth.js'
+import { get, getApiBaseUrl, getAuthToken, patch } from '../../lib/api.js'
 
 export function DashboardLayout() {
   const { user } = useAuth()
   const { profile } = useUserProfile()
   const location = useLocation()
   const [isSidebarOpen, setSidebarOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [showNotifications, setShowNotifications] = useState(false)
+
+  useEffect(() => {
+    if (!user) return undefined
+
+    get('/notifications')
+      .then((response) => setNotifications(response?.notifications || []))
+      .catch((error) => console.error('Erreur chargement notifications:', error))
+
+    const token = getAuthToken()
+    if (!token) return undefined
+
+    const stream = new EventSource(`${getApiBaseUrl()}/notifications/stream?token=${encodeURIComponent(token)}`)
+    stream.addEventListener('notification', (event) => {
+      const notification = JSON.parse(event.data)
+      setNotifications((current) => [notification, ...current.filter((item) => item.id !== notification.id)].slice(0, 30))
+    })
+
+    return () => stream.close()
+  }, [user])
+
+  const unreadCount = notifications.filter((notification) => !notification.read_at).length
+
+  const markAsRead = async (notification) => {
+    if (notification.read_at) return
+    try {
+      await patch(`/notifications/${notification.id}/read`)
+      setNotifications((current) => current.map((item) => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
+    } catch (error) {
+      console.error('Erreur mise à jour notification:', error)
+    }
+  }
 
   const handleSignOut = async () => {
     try {
@@ -165,10 +199,18 @@ export function DashboardLayout() {
           </div>
 
           <div className="flex items-center gap-3 sm:gap-4">
-            <button className="relative p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors hidden sm:block">
+            <div className="relative hidden sm:block">
+            <button onClick={() => setShowNotifications((current) => !current)} aria-label="Notifications" className="relative p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors">
               <Bell className="w-5 h-5" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full border-2 border-white"></span>
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full border-2 border-white flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
             </button>
+            {showNotifications && <div className="absolute right-0 top-12 z-40 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
+              <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3"><h3 className="font-semibold text-slate-900">Notifications</h3><span className="text-xs text-slate-400">{unreadCount} non lue(s)</span></div>
+              <div className="max-h-80 overflow-y-auto">
+                {notifications.length === 0 ? <p className="px-4 py-8 text-center text-sm text-slate-500">Aucune notification</p> : notifications.map((notification) => <button key={notification.id} onClick={() => markAsRead(notification)} className={`block w-full border-b border-slate-100 px-4 py-3 text-left hover:bg-emerald-50 ${notification.read_at ? 'bg-white' : 'bg-emerald-50/50'}`}><p className="text-sm font-semibold text-slate-900">{notification.title}</p><p className="mt-1 text-xs leading-5 text-slate-600">{notification.message}</p><p className="mt-1 text-[11px] text-slate-400">{new Date(notification.createdAt || notification.created_at).toLocaleString('fr-FR')}</p></button>)}
+              </div>
+            </div>}
+            </div>
           </div>
         </header>
 

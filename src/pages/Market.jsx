@@ -508,7 +508,7 @@ function OfficialPrices() {
       setLoading(true)
       try {
         const res = await get('/national_prices')
-        setPrices(res?.prices || [])
+        setPrices(res?.national_prices || [])
       } catch (err) {
         console.error('Erreur chargement prix marché:', err)
         setPrices([])
@@ -536,6 +536,7 @@ function OfficialPrices() {
                 <div>
                   <p className="font-semibold text-slate-900">{item.product_name}</p>
                   <p className="text-sm text-slate-500">{item.product_category}</p>
+                  <p className="text-xs text-slate-400">{item.region || 'Toutes les régions'}</p>
                 </div>
                 <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-emerald-700">
                   {item.status || 'actif'}

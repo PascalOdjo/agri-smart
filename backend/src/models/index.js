@@ -4,6 +4,9 @@ import Order from './Order.js'
 import Diagnostic from './Diagnostic.js'
 import Farm from './Farm.js'
 import PasswordReset from './PasswordReset.js'
+import Crop from './Crop.js'
+import Notification from './Notification.js'
+import NationalPrice from './NationalPrice.js'
 
 // User associations
 User.hasMany(Product, { foreignKey: 'farmerId', as: 'products' })
@@ -21,6 +24,16 @@ Diagnostic.belongsTo(User, { foreignKey: 'userId', as: 'user' })
 User.hasOne(Farm, { foreignKey: 'userId', as: 'farm' })
 Farm.belongsTo(User, { foreignKey: 'userId', as: 'owner' })
 
+User.hasMany(Crop, { foreignKey: 'userId', as: 'crops' })
+Crop.belongsTo(User, { foreignKey: 'userId', as: 'owner' })
+Farm.hasMany(Crop, { foreignKey: 'farmId', as: 'crops' })
+Crop.belongsTo(Farm, { foreignKey: 'farmId', as: 'farm' })
+
+User.hasMany(Notification, { foreignKey: 'userId', as: 'notifications' })
+Notification.belongsTo(User, { foreignKey: 'userId', as: 'user' })
+Crop.hasMany(Notification, { foreignKey: 'cropId', as: 'notifications' })
+Notification.belongsTo(Crop, { foreignKey: 'cropId', as: 'crop' })
+
 Product.hasMany(Order, { foreignKey: 'productId', as: 'orders' })
 Order.belongsTo(Product, { foreignKey: 'productId', as: 'product' })
 
@@ -33,5 +46,8 @@ export {
     Order,
     Diagnostic,
     Farm,
-    PasswordReset
+    PasswordReset,
+    Crop,
+    Notification,
+    NationalPrice
 }

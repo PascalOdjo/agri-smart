@@ -13,7 +13,7 @@ const router = express.Router()
 router.get('/', listProducts)
 router.post('/', authorize(['farmer']), createProduct)
 router.get('/:id', getProductById)
-router.put('/:id', authorize(['farmer']), updateProduct)
-router.delete('/:id', authorize(['farmer']), deleteProduct)
+router.put('/:id', authorize(['farmer', 'admin']), updateProduct)
+router.delete('/:id', authorize(['farmer', 'admin']), deleteProduct)
 
 export default router

@@ -126,6 +126,7 @@ export async function refreshToken() {
 export const get = (path, options = {}) => apiFetch(path, { method: 'GET', ...options })
 export const post = (path, body, options = {}) => apiFetch(path, { method: 'POST', body, ...options })
 export const put = (path, body, options = {}) => apiFetch(path, { method: 'PUT', body, ...options })
+export const patch = (path, body, options = {}) => apiFetch(path, { method: 'PATCH', body, ...options })
 export const del = (path, options = {}) => apiFetch(path, { method: 'DELETE', ...options })
 export const postFormData = (path, formData, options = {}) => apiFetch(path, { method: 'POST', body: formData, ...options })
 

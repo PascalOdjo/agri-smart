@@ -2,10 +2,10 @@ import fetch from 'node-fetch';
 import dotenv from 'dotenv';
 dotenv.config();
 
-const apiKey = process.env.GEMINI_API_KEY;
+const apiKey = process.env.GEMINI_API_KEY || process.env.GROQ_API_KEY || process.env.GROQ_TOKEN || process.env.SANITY_API_KEY || process.env.SANITY_TOKEN;
 
 if (!apiKey) {
-    console.error("Erreur: GEMINI_API_KEY n'est pas définie dans .env");
+    console.error("Erreur: Clé API Gemini/GROQ non définie (GEMINI_API_KEY | GROQ_API_KEY | GROQ_TOKEN | SANITY_API_KEY | SANITY_TOKEN).");
     process.exit(1);
 }
 
@@ -13,7 +13,7 @@ async function testGemini() {
     console.log("Test de l'API Gemini avec la clé : " + apiKey.substring(0, 10) + "...");
     try {
         const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-        
+
         const response = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

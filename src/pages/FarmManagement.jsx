@@ -14,6 +14,8 @@ export function FarmManagement() {
   const [editingFarm, setEditingFarm] = useState(null)
   const [editingParcel, setEditingParcel] = useState(null)
   const [selectedFarm, setSelectedFarm] = useState(null)
+  const [farmError, setFarmError] = useState('')
+  const [savingFarm, setSavingFarm] = useState(false)
 
   // Form states
   const [farmForm, setFarmForm] = useState({
@@ -81,7 +83,7 @@ export function FarmManagement() {
 
   const fetchCrops = async () => {
     try {
-      const res = await get(`/users/${user.id}/crops`)
+      const res = await get(`/crops?userId=${user.id}`)
       setCrops(res?.crops || [])
     } catch (error) {
       console.error('Erreur lors de la récupération des cultures:', error)
@@ -89,6 +91,13 @@ export function FarmManagement() {
   }
 
   const handleSaveFarm = async () => {
+    if (!farmForm.farm_name.trim()) {
+      setFarmError('Le nom de la ferme est obligatoire.')
+      return
+    }
+
+    setFarmError('')
+    setSavingFarm(true)
     try {
       const farmData = {
         ...farmForm,
@@ -105,9 +114,12 @@ export function FarmManagement() {
       }
 
       resetFarmForm()
-      fetchFarms()
+      await fetchFarms()
     } catch (error) {
       console.error('Erreur lors de l\'enregistrement de la ferme:', error)
+      setFarmError(error.message || 'Impossible d\'enregistrer la ferme. Vérifiez la connexion au serveur.')
+    } finally {
+      setSavingFarm(false)
     }
   }
 
@@ -186,6 +198,7 @@ export function FarmManagement() {
       notes: ''
     })
     setEditingFarm(null)
+    setFarmError('')
     setShowFarmForm(false)
   }
 
@@ -565,6 +578,12 @@ export function FarmManagement() {
               {editingFarm ? 'Modifier la ferme' : 'Nouvelle ferme'}
             </h3>
 
+            {farmError && (
+              <div className="mb-4 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                {farmError}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">Nom de la ferme</label>
@@ -663,9 +682,10 @@ export function FarmManagement() {
             <div className="flex gap-3 mt-6">
               <button
                 onClick={handleSaveFarm}
+                disabled={savingFarm}
                 className="bg-emerald-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-emerald-700 transition-colors"
               >
-                {editingFarm ? 'Mettre à jour' : 'Enregistrer'}
+                {savingFarm ? 'Enregistrement...' : editingFarm ? 'Mettre à jour' : 'Enregistrer'}
               </button>
               <button
                 onClick={resetFarmForm}

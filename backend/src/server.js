@@ -16,6 +16,12 @@ import productRoutes from './routes/productRoutes.js'
 import orderRoutes from './routes/orderRoutes.js'
 import diagnosticRoutes from './routes/diagnosticRoutes.js'
 import uploadRoutes from './routes/uploadRoutes.js'
+import formationRoutes from './routes/formationRoutes.js'
+import farmRoutes from './routes/farmRoutes.js'
+import cropRoutes from './routes/cropRoutes.js'
+import notificationRoutes from './routes/notificationRoutes.js'
+import { createDueCropNotifications } from './utils/cropNotifications.js'
+import nationalPriceRoutes from './routes/nationalPriceRoutes.js'
 import './models/index.js'
 
 // Load environment variables
@@ -31,8 +37,20 @@ const PORT = process.env.PORT || 3000
 app.use(helmet())
 
 // CORS configuration
+const allowedOrigins = [
+    process.env.FRONTEND_URL || 'http://localhost:5173',
+    'http://localhost:5174'
+];
+
 app.use(cors({
-    origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+    origin: function (origin, callback) {
+        // Allow requests with no origin (like curl, Postman) or from allowed origins/ngrok
+        if (!origin || allowedOrigins.includes(origin) || origin.includes('ngrok')) {
+            return callback(null, true);
+        }
+        const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+        return callback(new Error(msg), false);
+    },
     credentials: true,
     optionsSuccessStatus: 200
 }))
@@ -66,6 +84,11 @@ app.use('/api/products', authenticate, productRoutes)
 app.use('/api/orders', authenticate, orderRoutes)
 app.use('/api/diagnostics', authenticate, diagnosticRoutes)
 app.use('/api/upload', authenticate, uploadRoutes)
+app.use('/api/formations', authenticate, formationRoutes)
+app.use('/api', authenticate, farmRoutes)
+app.use('/api/crops', authenticate, cropRoutes)
+app.use('/api/notifications', authenticate, notificationRoutes)
+app.use('/api/national_prices', authenticate, nationalPriceRoutes)
 
 // 404 handler
 app.use((req, res) => {
@@ -88,11 +111,23 @@ async function startServer() {
         await sequelize.authenticate()
         console.log('✅ Database connection established')
 
-        // Sync models in development; use migrations in production
+        // Create missing tables in development; use migrations in production.
+        // ALTER can duplicate MySQL indexes on repeated Sequelize syncs.
         if (process.env.NODE_ENV !== 'production') {
-            await sequelize.sync({ alter: true })
+            await sequelize.sync({
+                alter: process.env.DB_SYNC_ALTER === 'true'
+            })
             console.log('✅ Database models synced')
         }
+
+        try {
+            await sequelize.query('ALTER TABLE `national_prices` ADD COLUMN IF NOT EXISTS `region` VARCHAR(100) NULL')
+        } catch (error) {
+            console.warn('⚠️ Impossible de synchroniser la colonne region des produits nationaux:', error.message)
+        }
+
+        await createDueCropNotifications()
+        setInterval(() => createDueCropNotifications().catch((error) => console.error('Notification scheduler error:', error)), 60000)
 
         // Start server
         app.listen(PORT, () => {
